@@ -1,0 +1,34 @@
+#!/bin/zsh
+# ask-ssh : seule commande que les clés SSH des raccourcis peuvent lancer sur ce Mac
+# (option command= dans ~/.ssh/authorized_keys). N'accepte que :
+#   ask-haiku --reset | ask-local --reset
+#   ask-haiku --chat [question] | ask-local --chat [question]
+# La question suit la commande ou arrive sur stdin ; elle est transmise au script, jamais exécutée.
+set -euo pipefail
+
+# Le raccourci envoie le texte de son champ « Script » : on tolère un chemin complet et des blancs.
+words=(${=SSH_ORIGINAL_COMMAND:-})
+refuse() {
+  print -u2 "ask-ssh : commande refusée (${SSH_ORIGINAL_COMMAND:-vide})."
+  exit 1
+}
+(( ${#words} >= 2 )) || refuse
+
+script="${words[1]:t}"
+target="/Users/$(/usr/bin/id -un)/.local/bin/$script"
+case "$script ${words[2]}" in
+  (ask-haiku\ --reset|ask-local\ --reset)
+    (( ${#words} == 2 )) || refuse
+    exec "$target" --reset
+    ;;
+  (ask-haiku\ --chat|ask-local\ --chat)
+    if (( ${#words} > 2 )); then
+      print -r -- "${(j: :)words[3,-1]}" | "$target" --chat
+    else
+      exec "$target" --chat
+    fi
+    ;;
+  (*)
+    refuse
+    ;;
+esac
