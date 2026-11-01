@@ -4,7 +4,10 @@
 #   ask-haiku --reset | ask-local --reset
 #   ask-haiku --chat [question] | ask-local --chat [question]
 # La question suit la commande ou arrive sur stdin ; elle est transmise au script, jamais exécutée.
+# Chaque question est notée dans ~/.cache/ask/ssh.log, sans son texte : un raccourci qui plante ne laisse sinon aucune trace ici.
 set -euo pipefail
+zmodload zsh/datetime
+readonly SSH_LOG="/Users/$(/usr/bin/id -un)/.cache/ask/ssh.log"
 
 # Le raccourci envoie le texte de son champ « Script » : on tolère un chemin complet et des blancs.
 words=(${=SSH_ORIGINAL_COMMAND:-})
@@ -22,11 +25,22 @@ case "$script ${words[2]}" in
     exec "$target" --reset
     ;;
   (ask-haiku\ --chat|ask-local\ --chat)
+    question=""
     if (( ${#words} > 2 )); then
-      print -r -- "${(j: :)words[3,-1]}" | "$target" --chat
+      question="${(j: :)words[3,-1]}"
     else
-      exec "$target" --chat
+      # Pas de question dans la commande : elle arrive sur stdin, ou Siri n'a rien entendu. Raccourcis peut laisser
+      # stdin ouvert sans rien y écrire : on n'attend pas, le raccourci expirerait.
+      IFS= read -r -t 2 question || true
     fi
+    /bin/mkdir -p "${SSH_LOG:h}"
+    said=(${=question})
+    print -r -- "$(/bin/date '+%F %T')  $script --chat : début, ${#said} mots" >> "$SSH_LOG"
+    start=$EPOCHREALTIME
+    code=0
+    print -r -- "$question" | "$target" --chat || code=$?
+    print -r -- "$(/bin/date '+%F %T')  $script --chat : fin, code $code, $(printf '%.1f' $(( EPOCHREALTIME - start ))) s" >> "$SSH_LOG"
+    exit $code
     ;;
   (*)
     refuse

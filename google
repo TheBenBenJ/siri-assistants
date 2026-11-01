@@ -1,0 +1,51 @@
+#!/usr/bin/python3 -I
+# google : ce qu'ask-haiku peut demander à Google, par la passerelle google-pont.py.
+#
+#   google mails ["recherche Gmail"]        la boîte de réception par défaut
+#   google mail <n°> [suite]                lit un mail de la dernière liste
+#   google contact "nom"
+#   google agenda [jours]
+#   google drive "mots"
+#   google document <n°> [suite]            lit un fichier de la dernière liste
+#   google taches
+#   google notes ["mot"]                    notes Keep, celles qui sont sensibles sans leur contenu
+#
+# Ces commandes ne font que proposer ; rien n'est fait tant que l'utilisateur n'a pas dit « oui » au tour suivant :
+#   google repondre <n°> "texte"
+#   google envoyer "adresse, nom ou moi" "objet" "texte"
+#   google brouillon "adresse, nom ou moi" "objet" "texte"
+#   google archiver <n°>
+#   google corbeille <n°>
+#   google rdv "titre" "vendredi 14h" [minutes] ["lieu"]
+#   google annuler-rdv <n°>
+#
+# Confirmer n'est volontairement pas une commande d'ici : seul le script de l'assistant le fait, voir outils.py --confirm.
+import json
+import sys
+import urllib.error
+import urllib.request
+
+ENDPOINT = "http://127.0.0.1:8766/action"
+ARGUMENTS = {"mails": ["requete"], "mail": ["numero", "suite"], "contact": ["requete"], "agenda": ["jours"], "drive": ["requete"], "document": ["numero", "suite"],
+             "taches": [], "notes": ["requete"], "repondre": ["numero", "texte"], "envoyer": ["a", "objet", "texte"], "brouillon": ["a", "objet", "texte"],
+             "archiver": ["numero"], "corbeille": ["numero"], "rdv": ["titre", "quand", "duree", "lieu"], "annuler-rdv": ["numero"]}
+
+
+def main():
+    action = sys.argv[1] if len(sys.argv) > 1 else ""
+    values = sys.argv[2:]
+    if action not in ARGUMENTS or len(values) > len(ARGUMENTS[action]):
+        sys.exit("Usage : google " + " | ".join(ARGUMENTS))
+    body = {"action": action, "args": dict(zip(ARGUMENTS[action], values))}
+    request = urllib.request.Request(ENDPOINT, json.dumps(body).encode(), {"X-Assistant": "1", "Content-Type": "application/json"})
+    try:
+        with urllib.request.build_opener(urllib.request.ProxyHandler({})).open(request, timeout=90) as response:
+            print(response.read().decode())
+    except urllib.error.HTTPError as e:
+        sys.exit(e.read().decode(errors="replace") or f"Le pont Google a répondu {e.code}.")
+    except OSError as e:
+        sys.exit(f"Le pont Google ne répond pas ({e}).")
+
+
+if __name__ == "__main__":
+    main()
