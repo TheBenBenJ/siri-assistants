@@ -6,6 +6,10 @@
 #   google-pont.py --autoriser    # autorisation dans le navigateur ; identifiants et jeton vont au trousseau
 #   google-pont.py --installer    # écrit et charge l'agent launchd
 #
+# Sous Linux, en service systemd : identifiants et jeton arrivent par LoadCredentialEncrypted=google-pont, un JSON
+# {"app": …, "token": …} déchiffré pour ce seul service ; l'autorisation se fait sur le Mac, puis on chiffre ce JSON
+# avec systemd-creds. ACTIONS_LOG, dans l'environnement, change l'emplacement du journal des actions.
+#
 # Pourquoi une passerelle : le trousseau est inaccessible par SSH, et le modèle ne doit jamais voir le jeton.
 # Lire est immédiat. Envoyer ou modifier n'est qu'une proposition gardée ici, en mémoire, décrite d'après ses vrais
 # paramètres. Seul le script de l'assistant l'exécute (/confirmer), quand l'utilisateur a dit « oui » au tour suivant :
@@ -38,7 +42,7 @@ from spoken_dates import say_date, say_time, spoken_moment  # noqa: E402
 HOME = pwd.getpwuid(os.getuid()).pw_dir
 PORT = 8766
 HOSTS = {f"127.0.0.1:{PORT}", f"localhost:{PORT}"}
-ACTIONS_LOG = os.path.join(HOME, ".cache/ask/actions.log")
+ACTIONS_LOG = os.environ.get("ACTIONS_LOG") or os.path.join(HOME, ".cache/ask/actions.log")
 NOTES_URL = "http://127.0.0.1:8765/notes"  # copie de Keep par le dashboard : Keep n'a pas d'API pour un compte personnel
 KEYCHAIN = "ask-google"
 LABEL = f"com.{pwd.getpwuid(os.getuid()).pw_name}.ask-google"
@@ -78,6 +82,12 @@ class Refusal(Exception):
 # --- Trousseau et appels à Google -------------------------------------------------------------
 
 def keychain_json(key):
+    if os.environ.get("CREDENTIALS_DIRECTORY"):  # service systemd : pas de trousseau, le JSON remis par systemd
+        try:
+            with open(os.path.join(os.environ["CREDENTIALS_DIRECTORY"], "google-pont")) as f:
+                return json.load(f).get(key)
+        except (OSError, ValueError):
+            return None
     done = subprocess.run(["/usr/bin/security", "find-generic-password", "-s", KEYCHAIN, "-a", key, "-w"], capture_output=True, text=True)
     try:
         return json.loads(done.stdout) if done.returncode == 0 else None
