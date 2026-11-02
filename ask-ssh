@@ -1,5 +1,5 @@
 #!/bin/zsh
-# ask-ssh : seule commande que les clés SSH des raccourcis peuvent lancer sur ce Mac
+# ask-ssh : seule commande que les clés SSH des raccourcis peuvent lancer sur cette machine (le Mac ou un serveur)
 # (option command= dans ~/.ssh/authorized_keys). N'accepte que :
 #   ask-haiku --reset | ask-local --reset
 #   ask-haiku --chat [question] | ask-local --chat [question]
@@ -7,7 +7,9 @@
 # Chaque question est notée dans ~/.cache/ask/ssh.log, sans son texte : un raccourci qui plante ne laisse sinon aucune trace ici.
 set -euo pipefail
 zmodload zsh/datetime
-readonly SSH_LOG="/Users/$(/usr/bin/id -un)/.cache/ask/ssh.log"
+me=$(/usr/bin/id -un)
+readonly HOME_DIR=~$me  # dossier personnel d'après le système (/Users/… sur le Mac, ailleurs sous Linux)
+readonly SSH_LOG="$HOME_DIR/.cache/ask/ssh.log"
 
 # Le raccourci envoie le texte de son champ « Script » : on tolère un chemin complet et des blancs.
 words=(${=SSH_ORIGINAL_COMMAND:-})
@@ -18,7 +20,7 @@ refuse() {
 (( ${#words} >= 2 )) || refuse
 
 script="${words[1]:t}"
-target="/Users/$(/usr/bin/id -un)/.local/bin/$script"
+target="$HOME_DIR/.local/bin/$script"
 case "$script ${words[2]}" in
   (ask-haiku\ --reset|ask-local\ --reset)
     (( ${#words} == 2 )) || refuse

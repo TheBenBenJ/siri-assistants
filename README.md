@@ -16,6 +16,18 @@ iPhone ou Mac → raccourci Siri → SSH via Tailscale → `ask-ssh` → `ask-ha
 - `ask-ssh` : seule commande permise aux clés SSH des raccourcis, via `command=` dans `authorized_keys`. La question est transmise au script, jamais exécutée.
 - `build-shortcuts.py` : génère et signe les deux raccourcis.
 
+## Sur un serveur Linux
+
+Les mêmes scripts tournent sur un serveur Linux allumé en permanence, sous un compte dédié : il faut zsh, jq, curl et pdftotext (poppler-utils), le modèle local servi sur `127.0.0.1:11234` (llama-server par exemple), et le pont Google en service systemd. `~/.config/siri-assistants/profil.json` y décrit les fichiers :
+
+```json
+{"racine": "/srv/fichiers", "lecture_seule": true, "dossiers": "iCloud et Google Drive, montés en lecture seule",
+ "recap": "/srv/fichiers/iCloud/05 Assistants/Recap du jour.json", "claude": "/home/assistants/.local/bin/claude",
+ "lecture_interdite": ["//etc/**"]}
+```
+
+`racine` : le dossier dont partent les chemins ; `lecture_seule` : ni écriture, ni déplacement, ni suppression ; `dossiers` : ce que contient la racine, dit aux modèles. Sans Spotlight, la recherche se fait par nom, bornée à 20 secondes. Les raccourcis se génèrent avec le nom du serveur et ce compte : `python3 build-shortcuts.py serveur.tailnet.ts.net assistants`.
+
 ## Installation
 
 Il faut macOS, Tailscale et la session à distance activée.

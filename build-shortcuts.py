@@ -2,6 +2,7 @@
 """Génère et signe les raccourcis Siri conversationnels, utilisables sur le Mac et sur l'iPhone.
 
     python3 build-shortcuts.py <nom Tailscale du Mac>     # ex. mon-mac.tailnet.ts.net
+    python3 build-shortcuts.py <nom du serveur> <compte>  # assistants installés sur un serveur, sous ce compte
 
 Chaque raccourci lance les scripts sur le Mac par SSH, via Tailscale : il marche donc sur les deux
 appareils. Il appelle `<script> --reset`, puis boucle question → réponse. La réponse sert d'invite
@@ -21,10 +22,10 @@ import uuid
 from pathlib import Path
 
 HERE = Path(__file__).resolve().parent
-if len(sys.argv) != 2:
-    sys.exit("usage : build-shortcuts.py <nom Tailscale du Mac>")
+if len(sys.argv) not in (2, 3):
+    sys.exit("usage : build-shortcuts.py <nom Tailscale de la machine> [compte, par défaut le tien]")
 SSH_HOST = sys.argv[1]
-SSH_USER = getpass.getuser()
+SSH_USER = sys.argv[2] if len(sys.argv) == 3 else getpass.getuser()
 SHORTCUTS = {"Appelle Claude": "ask-haiku", "Appelle Gemma": "ask-local"}  # Gemma n'est qu'un nom : ask-local interroge Qwen
 OBJECT = "￼"  # marque l'emplacement d'une variable dans un texte
 

@@ -14,6 +14,12 @@
 # scripts…). Supprimer, déplacer ou écraser n'est jamais immédiat : l'action est mise en attente,
 # ask-local pose la question, et seul un « oui » au tour suivant l'exécute. Une suppression part à
 # la Corbeille. Chaque modification est notée dans ~/.cache/ask/actions.log.
+#
+# Ailleurs que sur le Mac (un serveur Linux, par exemple), ~/.config/siri-assistants/profil.json change ce périmètre :
+#   {"racine": "/srv/fichiers", "lecture_seule": true, "dossiers": "iCloud et Google Drive", "recap": "…/Recap du jour.json"}
+# racine : le dossier dont les chemins partent ; lecture_seule : ni écriture, ni déplacement, ni suppression ;
+# dossiers : ce que contient la racine, dit au modèle. Sans Spotlight, la recherche se fait par nom.
+import html.parser
 import json
 import os
 import pwd
@@ -24,8 +30,24 @@ import time
 import unicodedata
 import urllib.error
 import urllib.request
+import zipfile
 
 HOME = pwd.getpwuid(os.getuid()).pw_dir
+
+
+def load_profile():
+    try:
+        with open(os.path.join(HOME, ".config/siri-assistants/profil.json")) as f:
+            return json.load(f)
+    except (OSError, ValueError):
+        return {}
+
+
+PROFILE = load_profile()
+ROOT = os.path.realpath(PROFILE.get("racine") or HOME)
+AT_HOME = ROOT == os.path.realpath(HOME)  # le Mac : le dossier personnel, avec ses règles (Library, Spotlight, Corbeille)
+READ_ONLY = bool(PROFILE.get("lecture_seule"))
+WRITING = {"write_file", "make_dir", "copy", "move", "delete"}
 BRIDGE = "http://127.0.0.1:8766"
 PENDING_FILE = os.path.join(HOME, ".cache/ask-local/pending.json")
 ACTIONS_LOG = os.path.join(HOME, ".cache/ask/actions.log")
@@ -108,6 +130,16 @@ SCHEMA = [
      "description": "Son récap du jour : météo, agenda, à faire, mails à traiter. Pour « mon récap », « résume ma journée », « qu'est-ce que j'ai aujourd'hui ». Lu tel quel à l'utilisateur.",
      "parameters": {"type": "object", "properties": {}}},
 ]
+if not AT_HOME:  # hors du Mac : chemins relatifs à la racine du profil, recherche par nom seulement, lecture seule s'il le dit
+    where = PROFILE.get("dossiers") or "ses dossiers"
+    for tool in SCHEMA:
+        if tool["name"] == "list_dir":
+            tool["parameters"]["properties"]["path"]["description"] = f"Dossier, relatif à la racine de ses fichiers : {where}."
+        elif tool["name"] == "search":
+            tool["description"] = "Cherche des fichiers et dossiers par nom (pas dans leur contenu)."
+            tool["parameters"]["properties"]["folder"]["description"] = "Dossier où chercher ; par défaut toute la racine, plus lent."
+    if READ_ONLY:
+        SCHEMA = [tool for tool in SCHEMA if tool["name"] not in WRITING]
 
 
 class Refus(Exception):
@@ -125,12 +157,12 @@ def tolerant(path):
     « Téléchargements » pour Downloads. Ne retient un élément que s'il est le seul à correspondre."""
     if os.path.lexists(path):
         return path
-    parts = os.path.relpath(path, HOME).split("/") if path.startswith(HOME + "/") else None
+    parts = os.path.relpath(path, ROOT).split("/") if path.startswith(ROOT + "/") else None
     if not parts or parts[0] == "..":
         return path
-    if not os.path.lexists(os.path.join(HOME, parts[0])):
+    if AT_HOME and not os.path.lexists(os.path.join(ROOT, parts[0])):
         parts[0] = FRENCH_DIRS.get(parts[0].lower(), parts[0])
-    current = HOME
+    current = ROOT
     for part in parts:
         candidate = os.path.join(current, part)
         if not os.path.lexists(candidate):
@@ -150,19 +182,21 @@ def tolerant(path):
 def resolve(path, must_exist=True):
     """Chemin absolu réel, refusé s'il sort du périmètre."""
     path = (path or "").strip()
-    if path in ("", "~", "."):
-        path = HOME
+    if path in ("", "~", ".", "/"):
+        path = ROOT
+    if path.startswith("~") and not AT_HOME:  # hors du Mac, « ~ » désigne la racine des fichiers
+        path = ROOT + path[1:]
     path = os.path.expanduser(path)
-    if not os.path.isabs(path):
-        path = os.path.join(HOME, path)
+    if not os.path.isabs(path) or (not AT_HOME and not path.startswith(ROOT)):
+        path = os.path.join(ROOT, path.lstrip("/"))
     real = os.path.realpath(tolerant(os.path.normpath(path)))
-    if real != HOME and not real.startswith(HOME + "/"):
-        raise Refus(f"{path} est hors du dossier personnel.")
-    rel = os.path.relpath(real, HOME)
+    if real != ROOT and not real.startswith(ROOT + "/"):
+        raise Refus(f"{path} est hors {'du dossier personnel' if AT_HOME else 'de ses fichiers'}.")
+    rel = os.path.relpath(real, ROOT)
     first = rel.split("/")[0]
     if rel != "." and first.startswith("."):
-        raise Refus(f"{show(real)} est un élément caché du dossier personnel, inaccessible.")
-    if first == "Library" and not (rel + "/").startswith("Library/CloudStorage/"):
+        raise Refus(f"{show(real)} est un élément caché, inaccessible.")
+    if AT_HOME and first == "Library" and not (rel + "/").startswith("Library/CloudStorage/"):
         raise Refus(f"{show(real)} est dans Library, inaccessible (sauf Google Drive).")
     if must_exist and not os.path.lexists(real):
         raise Refus(f"{show(real)} n'existe pas.")
@@ -170,11 +204,16 @@ def resolve(path, must_exist=True):
 
 
 def show(path):
+    if not AT_HOME:
+        return "la racine" if path == ROOT else os.path.relpath(path, ROOT) if path.startswith(ROOT + "/") else path
     return "~" if path == HOME else "~/" + os.path.relpath(path, HOME) if path.startswith(HOME + "/") else path
 
 
 def protected_root(real):
-    return real == HOME or os.path.dirname(real) == os.path.join(HOME, "Library/CloudStorage")
+    """La racine et ce qui y est monté (Library/CloudStorage sur le Mac) ne se déplacent ni ne se suppriment."""
+    if AT_HOME:
+        return real == HOME or os.path.dirname(real) == os.path.join(HOME, "Library/CloudStorage")
+    return real == ROOT or os.path.dirname(real) == ROOT
 
 
 def into_dir(source, destination):
@@ -247,8 +286,27 @@ def list_dir(path, sort="nom"):
     return head + "\n" + "\n".join(lines) if lines else f"{show(real)} est vide."
 
 
+def search_by_name(query, real, budget=20):
+    """Sans Spotlight : parcours des noms, dossiers cachés exclus, borné dans le temps (un dossier en ligne monté se liste lentement)."""
+    wanted, found, deadline = loose(query), [], time.monotonic() + budget
+    for top, dirs, files in os.walk(real):
+        dirs[:] = sorted(d for d in dirs if not d.startswith("."))
+        found += [os.path.join(top, n) for n in dirs + sorted(files) if not n.startswith(".") and wanted in loose(n)]
+        if time.monotonic() > deadline:
+            return found, False
+    return found, True
+
+
 def search(query, folder="~"):
     real = resolve(folder)
+    if not os.path.exists("/usr/bin/mdfind"):
+        found, complete = search_by_name(query, real)
+        if not found:
+            return f"Aucun nom ne contient « {query} » dans {show(real)}" + ("." if complete else ", sur la partie parcourue en 20 secondes : précise le dossier.")
+        lines = [show(p) + ("/" if os.path.isdir(p) else "") for p in found[:MAX_SEARCH]]
+        more = f" ({MAX_SEARCH} premiers affichés)" if len(found) > MAX_SEARCH else ""
+        partial = "" if complete else " Recherche arrêtée au bout de 20 secondes : il peut y en avoir d'autres, précise le dossier."
+        return f"{len(found)} résultats{more} :{partial}\n" + "\n".join(lines)
     found = []
     for extra in (["-name", query], [query]):
         try:
@@ -270,19 +328,61 @@ def search(query, folder="~"):
     return f"{len(found)} résultats{more} :\n" + "\n".join(lines)
 
 
+class TextOnly(html.parser.HTMLParser):
+    def __init__(self):
+        super().__init__()
+        self.parts, self.skip = [], 0
+
+    def handle_starttag(self, tag, attrs):
+        self.skip += tag in ("script", "style")
+        if tag in ("p", "br", "div", "li", "tr", "h1", "h2", "h3", "text:p", "text:h", "w:p"):
+            self.parts.append("\n")
+
+    def handle_endtag(self, tag):
+        self.skip -= tag in ("script", "style") and self.skip > 0
+
+    def handle_data(self, data):
+        if not self.skip:
+            self.parts.append(data)
+
+
+def office_text(real, ext):
+    """Sans textutil (hors du Mac) : Word et OpenDocument se lisent dans leur XML, le HTML sans ses balises."""
+    if ext in (".docx", ".odt"):
+        try:
+            with zipfile.ZipFile(real) as z:
+                xml = z.read("word/document.xml" if ext == ".docx" else "content.xml").decode("utf-8", "replace")
+        except (zipfile.BadZipFile, KeyError) as e:
+            raise Refus(f"{show(real)} est illisible ({e}).") from e
+    elif ext in (".html", ".htm"):
+        with open(real, "rb") as f:
+            xml = f.read(2_000_000).decode("utf-8", "replace")
+    else:
+        raise Refus(f"{show(real)} est au format {ext}, illisible ici.")
+    parser = TextOnly()
+    parser.feed(xml)
+    return "".join(parser.parts)
+
+
 def read_file(path, start=0):
     real = resolve(path)
     if os.path.isdir(real):
         raise Refus(f"{show(real)} est un dossier : utilise list_dir.")
     ext = os.path.splitext(real)[1].lower()
-    if ext == ".pdf":
+    if ext == ".pdf" and os.path.exists("/usr/bin/osascript"):
         js = ("ObjC.import('PDFKit');function run(a){var d=$.PDFDocument.alloc.initWithURL("
               "$.NSURL.fileURLWithPath(a[0]));return d.isNil()?'':ObjC.unwrap(d.string)||'';}")
         text = subprocess.run(["/usr/bin/osascript", "-l", "JavaScript", "-e", js, real],
                               capture_output=True, text=True, timeout=60).stdout
-    elif ext in TEXTUTIL_EXT:
+    elif ext == ".pdf":
+        if not shutil.which("pdftotext"):
+            raise Refus(f"{show(real)} est un PDF, et pdftotext manque ici pour le lire.")
+        text = subprocess.run(["pdftotext", "-enc", "UTF-8", real, "-"], capture_output=True, text=True, timeout=60).stdout
+    elif ext in TEXTUTIL_EXT and os.path.exists("/usr/bin/textutil"):
         text = subprocess.run(["/usr/bin/textutil", "-convert", "txt", "-stdout", real],
                               capture_output=True, text=True, timeout=60).stdout
+    elif ext in TEXTUTIL_EXT:
+        text = office_text(real, ext)
     else:
         with open(real, "rb") as f:
             raw = f.read(2_000_000)
@@ -482,6 +582,8 @@ def main():
             bridge_quiet("/annuler")
             if os.path.exists(PENDING_FILE):
                 os.remove(PENDING_FILE)
+        elif arg in WRITING and READ_ONLY:
+            raise Refus("ici, les fichiers sont en lecture seule : rien ne peut être écrit, déplacé ni supprimé.")
         elif arg in TOOLS:
             args = json.loads(sys.argv[2]) if len(sys.argv) > 2 and sys.argv[2].strip() else {}
             print(TOOLS[arg](**args), end="")
