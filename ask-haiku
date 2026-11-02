@@ -219,6 +219,7 @@ if [[ -x $CLAUDE_BIN ]]; then
     said="[Le système a exécuté ceci après le oui de l'utilisateur : $(<"$NOTE_FILE")] $question"
   fi
   /bin/rm -f "$NOTE_FILE"
+  /bin/mkdir -p "${AGENT_ERRORS:h}"  # sinon, au tout premier lancement, la redirection des erreurs fait échouer claude
   # Question sur stdin : les options à plusieurs valeurs (--tools) avaleraient un argument final.
   if agent_json="$(cd "$FILES_ROOT" && print -r -- "$said" | /usr/bin/env -i HOME="$HOME_DIR" LC_ALL="$LC_ALL" \
        PATH=/usr/bin:/bin:/usr/sbin:/sbin:/opt/homebrew/bin:"$HOME_DIR/.local/bin" "$CLAUDE_BIN" "${agent_args[@]}" 2>"$AGENT_ERRORS.last")" \
