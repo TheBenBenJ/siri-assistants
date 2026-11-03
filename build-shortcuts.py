@@ -1,17 +1,16 @@
 #!/usr/bin/env python3
-"""Génère et signe les raccourcis Siri conversationnels, utilisables sur le Mac et sur l'iPhone.
+"""Builds and signs the two conversational Siri shortcuts, usable on the Mac and on the iPhone.
 
-    python3 build-shortcuts.py <nom Tailscale du Mac>     # ex. mon-mac.tailnet.ts.net
-    python3 build-shortcuts.py <nom du serveur> <compte>  # assistants installés sur un serveur, sous ce compte
+    python3 build-shortcuts.py <Tailscale name of the Mac>   # e.g. my-mac.tailnet.ts.net
+    python3 build-shortcuts.py <server name> <account>       # assistants installed on a server, under that account
 
-Chaque raccourci lance les scripts sur le Mac par SSH, via Tailscale : il marche donc sur les deux
-appareils. Il appelle `<script> --reset`, puis boucle question → réponse. La réponse sert d'invite
-à la question suivante : Siri la lit, puis réécoute. Le script répond __fin__ à « merci »,
-« stop »… et le raccourci s'arrête.
+Each shortcut runs the scripts on that machine over SSH, through Tailscale, so the same shortcut works on both
+devices. It calls `<script> --reset`, then loops question -> answer. The answer is the prompt of the next question:
+Siri reads it aloud, then listens again. The script answers __fin__ to "merci", "stop"... and the shortcut stops.
 
-La clé SSH de chaque appareil (une par appareil, créée par Raccourcis) doit figurer dans
-~/.ssh/authorized_keys du Mac, limitée à ~/.local/bin/ask-ssh. Les .shortcut signés sont écrits à
-côté de ce fichier : il suffit de les ouvrir pour les importer.
+Each device's SSH key (one per device, created by Shortcuts) must be in that machine's ~/.ssh/authorized_keys,
+restricted to ask-ssh. The signed .shortcut files are written next to this file: open them to import them.
+Needs macOS, for `shortcuts sign`. Names and texts are French: they are what Siri hears and says.
 """
 import getpass
 import plistlib
@@ -26,8 +25,9 @@ if len(sys.argv) not in (2, 3):
     sys.exit("usage : build-shortcuts.py <nom Tailscale de la machine> [compte, par défaut le tien]")
 SSH_HOST = sys.argv[1]
 SSH_USER = sys.argv[2] if len(sys.argv) == 3 else getpass.getuser()
-SHORTCUTS = {"Appelle Claude": "ask-haiku", "Appelle Gemma": "ask-local"}  # Gemma n'est qu'un nom : ask-local interroge Qwen
-OBJECT = "￼"  # marque l'emplacement d'une variable dans un texte
+# The shortcut's name is the Siri phrase. "Gemma" is only a name: ask-local asks Qwen, a word Siri mishears.
+SHORTCUTS = {"Appelle Claude": "ask-haiku", "Appelle Gemma": "ask-local"}
+OBJECT = "￼"  # U+FFFC, marks where a variable sits in a text
 
 
 def new_uuid():
@@ -47,7 +47,7 @@ def attachment(value):
 
 
 def text_with(prefix, value):
-    """Texte fait d'un préfixe fixe suivi d'une variable."""
+    """Text made of a fixed prefix followed by a variable."""
     return {
         "Value": {"attachmentsByRange": {f"{{{len(prefix)}, 1}}": value}, "string": prefix + OBJECT},
         "WFSerializationType": "WFTextTokenString",
@@ -55,7 +55,7 @@ def text_with(prefix, value):
 
 
 def remote(script):
-    """Exécute `script` sur le Mac par SSH, avec la clé SSH de l'appareil qui lance le raccourci."""
+    """Runs `script` on the machine over SSH, with the SSH key of the device that runs the shortcut."""
     action_uuid = new_uuid()
     return action_uuid, action("is.workflow.actions.runsshscript", UUID=action_uuid,
                                WFSSHAuthenticationType="SSH Key", WFSSHHost=SSH_HOST,
@@ -63,13 +63,14 @@ def remote(script):
 
 
 def workflow(command):
+    """The shortcut: reset, ask, then up to 50 rounds of answer-as-prompt, until the script says __fin__."""
     first_ask, next_ask, loop, stop = (new_uuid() for _ in range(4))
     _, reset = remote(f"{command} --reset")
-    # La question suit la commande : ask-ssh la transmet au script sans jamais l'exécuter.
+    # The question follows the command: ask-ssh hands it to the script, never runs it.
     answer_uuid, chat = remote(text_with(f"{command} --chat ", {"Type": "Variable", "VariableName": "Question"}))
     answer = output_of(answer_uuid, "Résultat du script")
-    # Raccourcis peut voir la sortie d'un script comme un fichier : il faut la lire comme texte
-    # pour la comparer, sinon le « Si » échoue avec « Choisissez une valeur pour chaque paramètre ».
+    # Shortcuts may see a script's output as a file: it must be read as text to be compared, otherwise the "If" fails
+    # with "Choisissez une valeur pour chaque paramètre" (choose a value for each parameter).
     answer_as_text = dict(answer, Aggrandizements=[
         {"CoercionItemClass": "WFStringContentItem", "Type": "WFCoercionVariableAggrandizement"}])
     actions = [
@@ -81,7 +82,7 @@ def workflow(command):
         action("is.workflow.actions.repeat.count", GroupingIdentifier=loop, WFControlFlowMode=0,
                WFRepeatCount=50),
         chat,
-        # WFCondition 4 = « est » ; le script renvoie exactement __fin__, sans retour à la ligne.
+        # WFCondition 4 = "is"; the script returns exactly __fin__, without a newline.
         action("is.workflow.actions.conditional", GroupingIdentifier=stop, WFControlFlowMode=0,
                WFCondition=4, WFConditionalActionString="__fin__",
                WFInput={"Type": "Variable", "Variable": attachment(answer_as_text)}),
