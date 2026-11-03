@@ -1,6 +1,6 @@
-# Light CI: syntax checks and the offline tests. No secret, no deployment, no
-# connection to the server or the Mac. The tests fake Google: no network, no account,
-# no token.
+# CI: checks (the steps below), then promotion: a green push on main fast-forwards the branch `production`,
+# which the home server's deployer pulls and applies (the owner's choice of 03/11/2026: a green push goes to production).
+# No secret, no connection to the server or the Mac. Agents read the result with `gh run list` and `gh run view`.
 name: CI
 
 on:
@@ -14,10 +14,16 @@ on:
 permissions:
   contents: read
 
+concurrency:   # a newer push cancels the run of an older one: `production` only moves forward
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   checks:
     runs-on: ubuntu-latest
     timeout-minutes: 5
+    permissions:
+      contents: write   # for the promotion only; the checks never use the token
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -88,3 +94,12 @@ jobs:
           done < <(git ls-files -z -- 'tests/test_*.py' ':(exclude)tests/test_recap.py')
           [ "$found" = 1 ] || echo "::warning::no offline test found (tests/test_*.py)"
           exit $status
+
+      - name: Promote to production
+        # Fast-forward only: GitHub refuses anything else, and the run turns red.
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh api -X PATCH "repos/$GITHUB_REPOSITORY/git/refs/heads/production" -f sha="$GITHUB_SHA" -F force=false > /dev/null \
+            || gh api -X POST "repos/$GITHUB_REPOSITORY/git/refs" -f ref=refs/heads/production -f sha="$GITHUB_SHA" > /dev/null
