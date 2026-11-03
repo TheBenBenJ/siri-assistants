@@ -16,10 +16,11 @@
 # moving or overwriting is never immediate: the action waits in PENDING_FILE, ask-local asks, and only a "oui" on the
 # next turn runs it. Deleted items go to the Trash. Every change is logged to ~/.cache/ask/actions.log.
 #
-# Elsewhere (a Linux server), ~/.config/siri-assistants/profil.json changes the scope:
-#   {"racine": "/srv/files", "lecture_seule": true, "dossiers": "iCloud and Google Drive", "recap": ".../Recap du jour.json"}
-# racine (root): where paths start; lecture_seule (read-only): no writing, moving or deleting, and the write tools are
-# not even offered; dossiers (folders): what the root holds, told to the model. Without Spotlight, search goes by name.
+# Elsewhere (a Linux server), ~/.config/siri-assistants/profile.json changes the scope:
+#   {"root": "/srv/files", "read_only": true, "folders": "iCloud and Google Drive", "recap": ".../Recap du jour.json"}
+# root: where paths start; read_only: no writing, moving or deleting, and the write tools are not even offered;
+# folders: what the root holds, told to the model. Without Spotlight, search goes by name. Without a readable
+# profile.json, the former profil.json is read, with French keys: racine, lecture_seule, dossiers.
 #
 # Everything printed here is read by the model and often said back to the user, so it stays French.
 import html.parser
@@ -38,19 +39,29 @@ import zipfile
 HOME = pwd.getpwuid(os.getuid()).pw_dir
 
 
+PROFILE_FILES = [os.path.join(HOME, ".config/siri-assistants", name) for name in ("profile.json", "profil.json")]
+
+
 def load_profile():
-    """The server profile; {} on the Mac, which has none."""
+    """The server profile: profile.json, or the former profil.json without a readable profile.json; {} on the Mac."""
+    path = next((p for p in PROFILE_FILES if os.access(p, os.R_OK)), PROFILE_FILES[-1])
     try:
-        with open(os.path.join(HOME, ".config/siri-assistants/profil.json")) as f:
+        with open(path) as f:
             return json.load(f)
     except (OSError, ValueError):
         return {}
 
 
+def setting(key, former_key):
+    """A profile value under its English key, else under the French key of a former profile (like jq's //)."""
+    value = PROFILE.get(key)
+    return PROFILE.get(former_key) if value is None or value is False else value
+
+
 PROFILE = load_profile()
-ROOT = os.path.realpath(PROFILE.get("racine") or HOME)
+ROOT = os.path.realpath(setting("root", "racine") or HOME)
 AT_HOME = ROOT == os.path.realpath(HOME)  # the Mac: the home folder, with its own rules (Library, Spotlight, Trash)
-READ_ONLY = bool(PROFILE.get("lecture_seule"))
+READ_ONLY = bool(setting("read_only", "lecture_seule"))
 WRITING = {"write_file", "make_dir", "copy", "move", "delete"}
 BRIDGE = "http://127.0.0.1:8766"
 PENDING_FILE = os.path.join(HOME, ".cache/ask-local/pending.json")
@@ -137,7 +148,7 @@ SCHEMA = [
      "parameters": {"type": "object", "properties": {}}},
 ]
 if not AT_HOME:  # off the Mac: paths relative to the profile's root, search by name only, read-only if the profile says so
-    where = PROFILE.get("dossiers") or "ses dossiers"
+    where = setting("folders", "dossiers") or "ses dossiers"
     for tool in SCHEMA:
         if tool["name"] == "list_dir":
             tool["parameters"]["properties"]["path"]["description"] = f"Dossier, relatif à la racine de ses fichiers : {where}."

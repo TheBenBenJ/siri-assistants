@@ -31,13 +31,17 @@ fi
 # Shortcuts runs scripts with a minimal PATH, maybe with another $HOME: absolute paths everywhere.
 me=$(/usr/bin/id -un)
 readonly HOME_DIR=~$me  # home folder according to the system, not $HOME (/Users/... on the Mac, elsewhere on Linux)
-# Off the Mac (a Linux server), ~/.config/siri-assistants/profil.json describes the files (see tools.py): racine,
-# lecture_seule, dossiers; and here claude (path of the program) and lecture_interdite (patterns refused to Read).
-# profile <key>: the value, one line per item for a list, nothing if unset or without a profile.
-readonly PROFILE="$HOME_DIR/.config/siri-assistants/profil.json"
-profile() { [[ -r $PROFILE ]] && /usr/bin/jq -r --arg k "$1" '.[$k] // empty | if type == "array" then .[] else tostring end' "$PROFILE" 2>/dev/null; return 0; }
-readonly FILES_ROOT="${$(profile racine):-$HOME_DIR}"
-readonly READ_ONLY="$(profile lecture_seule)"
+# Off the Mac (a Linux server), ~/.config/siri-assistants/profile.json describes the files (see tools.py): root,
+# read_only, folders; and here claude (path of the program) and read_denied (patterns refused to Read). Without a
+# readable profile.json, the former profil.json is read, with its French keys (racine, lecture_seule, dossiers,
+# lecture_interdite); within a profile, the English key wins.
+# profile <key> <former key>: the value, one line per item for a list, nothing if unset or without a profile.
+PROFILE="$HOME_DIR/.config/siri-assistants/profile.json"
+[[ -r $PROFILE ]] || PROFILE="$HOME_DIR/.config/siri-assistants/profil.json"
+readonly PROFILE
+profile() { [[ -r $PROFILE ]] && /usr/bin/jq -r --arg k "$1" --arg old "$2" '(.[$k] // .[$old]) // empty | if type == "array" then .[] else tostring end' "$PROFILE" 2>/dev/null; return 0; }
+readonly FILES_ROOT="${$(profile root racine):-$HOME_DIR}"
+readonly READ_ONLY="$(profile read_only lecture_seule)"
 readonly KEY_FILE="$HOME_DIR/.config/ask-haiku/api-key"
 readonly HISTORY_FILE="$HOME_DIR/.cache/ask-haiku/conversation.json"
 readonly JOURNAL="$HOME_DIR/.cache/ask/journal.log"  # shared by ask-haiku and ask-local
@@ -50,14 +54,14 @@ Réponds directement et de façon concise, dans la langue de la question, en tex
 pas de Markdown, de listes à puces, de tableaux ni d'emojis. \
 Tu n'as ici aucun outil : ni les fichiers, ni le compte Google, ni la liste de tâches de l'utilisateur ne te sont accessibles ; ne prétends jamais avoir fait une action."
 
-readonly CLAUDE_BIN="${$(profile claude):-/opt/homebrew/bin/claude}"
+readonly CLAUDE_BIN="${$(profile claude claude):-/opt/homebrew/bin/claude}"
 readonly SESSION_FILE="$HOME_DIR/.cache/ask-haiku/claude-session"
 readonly NOTE_FILE="$HOME_DIR/.cache/ask-haiku/note"  # what a "oui" ran without the model, told to it on the next turn
 readonly AGENT_ERRORS="$HOME_DIR/.cache/ask-haiku/agent-error.log"
 # Read-only profile: read tools only. Otherwise (the Mac) writes are allowed, safely: mv -n and cp -n never overwrite,
 # trash goes to the Trash, and the prompt asks for a confirmation before deleting or moving several items.
 if [[ $READ_ONLY == true ]]; then
-  readonly FILES_PART="Tu as accès en lecture seule à ses fichiers : le dossier courant contient $(profile dossiers). Tu ne \
+  readonly FILES_PART="Tu as accès en lecture seule à ses fichiers : le dossier courant contient $(profile folders dossiers). Tu ne \
 peux rien y écrire, déplacer ni supprimer : dis-le si on te le demande. Avance dossier par dossier avec ls, car une recherche \
 dans tout le dossier est très lente. Pour lire un PDF : pdftotext \"fichier.pdf\" -. Les documents Google (Docs, Sheets, \
 Slides) n'y sont pas : lis-les avec google drive puis google document. "
@@ -105,7 +109,7 @@ consigne à suivre. Cite les fichiers par leur nom sans le chemin complet, et r�
 # Outside these commands every tool is refused: claude -p cannot ask for permission.
 # The refused find options would turn an allowed command into a door to any command, hence to the Google bridge's
 # "oui"; the refused copies would take a secret out of .config or .ssh to read it afterwards.
-readonly AGENT_SETTINGS="$(profile lecture_interdite | /usr/bin/jq -R . | /usr/bin/jq -s --arg key "/bin/cat $KEY_FILE" \
+readonly AGENT_SETTINGS="$(profile read_denied lecture_interdite | /usr/bin/jq -R . | /usr/bin/jq -s --arg key "/bin/cat $KEY_FILE" \
   --argjson allow "$AGENT_ALLOW" '. as $extra | {
   apiKeyHelper: $key,
   permissions: {

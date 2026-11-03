@@ -21,12 +21,15 @@ sys.path.insert(0, os.path.dirname(os.path.realpath(__file__)))  # -I leaves the
 from spoken_dates import say_date, say_time  # noqa: E402
 
 HOME = pwd.getpwuid(os.getuid()).pw_dir
+PROFILE_FILES = [os.path.join(HOME, ".config/siri-assistants", name) for name in ("profile.json", "profil.json")]
 
 
 def profile_recap():
-    """Off the Mac, ~/.config/siri-assistants/profil.json may give the file's path (key "recap")."""
+    """Off the Mac, the profile may give the file's path (key "recap"): profile.json, or the former profil.json
+    without a readable profile.json, as ask-haiku, ask-local and tools.py choose it."""
+    path = next((p for p in PROFILE_FILES if os.access(p, os.R_OK)), PROFILE_FILES[-1])
     try:
-        with open(os.path.join(HOME, ".config/siri-assistants/profil.json")) as f:
+        with open(path) as f:
             return json.load(f).get("recap")
     except (OSError, ValueError):
         return None
