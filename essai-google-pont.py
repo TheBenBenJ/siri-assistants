@@ -163,7 +163,7 @@ def main():
     pont.TOKEN_URL, pont.NOTES_URL = base + "/token", base + "/notes"
     pont.ACTIONS_LOG = "/tmp/essai-google-pont-actions.log"
     if "--servir" in sys.argv:
-        pont.keychain_json = lambda key: {"app": {"client_id": "i", "client_secret": "s"}, "token": {"refresh_token": "r"}}[key]
+        pont.credential = lambda key: {"app": {"client_id": "i", "client_secret": "s"}, "token": {"refresh_token": "r"}}[key]
         print("faux Google derrière le vrai port du pont", flush=True)
         ThreadingHTTPServer(("127.0.0.1", pont.PORT), pont.Bridge).serve_forever()
     server = ThreadingHTTPServer(("127.0.0.1", 0), pont.Bridge)
@@ -172,10 +172,10 @@ def main():
     threading.Thread(target=server.serve_forever, daemon=True).start()
 
     print("Sans autorisation")
-    pont.keychain_json = lambda key: None
+    pont.credential = lambda key: None
     code, text = action("mails")
     check(code == 400 and "--autoriser" in text, "le pont le dit au lieu de planter", text)
-    pont.keychain_json = lambda key: {"app": {"client_id": "i", "client_secret": "s"}, "token": {"refresh_token": "r"}}[key]
+    pont.credential = lambda key: {"app": {"client_id": "i", "client_secret": "s"}, "token": {"refresh_token": "r"}}[key]
 
     print("Portes du pont")
     check(call("/attente", host="pirate.exemple.fr")[0] == 403, "un autre Host est refusé (DNS rebinding)")
