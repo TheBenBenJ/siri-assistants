@@ -1,13 +1,15 @@
 #!/usr/bin/python3 -I
-# ajouter-tache : ajoute une tâche à la liste de l'utilisateur et dit où elle est allée.
+# ajouter-tache ("add task"): adds a task to the user's list and says where it went.
 #
 #   ajouter-tache "Appeler le garage"
-#   ajouter-tache "Appeler le garage" vendredi     # ou : demain, 3 novembre, 3/11, 2026-11-06
+#   ajouter-tache "Appeler le garage" vendredi     # or: demain, 3 novembre, 3/11, 2026-11-06
 #
-# Utilisé par ask-haiku et ask-local. La tâche passe par le serveur du dashboard, qui tourne dans la session
-# de l'utilisateur et la recopie dans Google Tasks : le jeton Google est dans le trousseau, inaccessible par SSH.
-# Elle reste jusqu'à ce qu'elle soit cochée, sur le dashboard ou dans Google Tasks.
-# Chaque ajout est noté dans ~/.cache/ask/actions.log.
+# Used by ask-haiku (as a shell command) and ask-local (tool add_task). The French name is the command the models are
+# told to run and the name the installers link, so it stays.
+#
+# The task goes through the dashboard's local server (POST /taches), which copies it to Google Tasks: the dashboard
+# owns the Tasks token and the two-way sync, and the assistants never hold it. The task stays until it is ticked,
+# on the dashboard or in Google Tasks. Every addition is logged to ~/.cache/ask/actions.log.
 import datetime
 import json
 import os
@@ -17,12 +19,12 @@ import time
 import urllib.error
 import urllib.request
 
-sys.path.insert(0, os.path.dirname(os.path.realpath(__file__)))
+sys.path.insert(0, os.path.dirname(os.path.realpath(__file__)))  # -I leaves the script's folder out of sys.path
 from spoken_dates import say_date, spoken_date  # noqa: E402
 
 HOME = pwd.getpwuid(os.getuid()).pw_dir
 ACTIONS_LOG = os.path.join(HOME, ".cache/ask/actions.log")
-ENDPOINT = "http://127.0.0.1:8765/taches"
+ENDPOINT = "http://127.0.0.1:8765/taches"  # the dashboard; adapt to your own service
 
 
 def main():
@@ -37,11 +39,12 @@ def main():
             sys.exit(f"ajouter-tache : je ne comprends pas la date « {sys.argv[2]} », tâche non ajoutée.")
         due_text = f", pour le {say_date(date)}"
 
+    # The dashboard's API: French keys; "assistant" marks a task kept until it is ticked.
     body = {"action": "ajouter", "assistant": True, "libelle": title, "echeance": date.isoformat() if date else ""}
     request = urllib.request.Request(ENDPOINT, json.dumps(body).encode(), {"X-Dashboard": "1", "Content-Type": "application/json"})
     try:
         with urllib.request.build_opener(urllib.request.ProxyHandler({})).open(request, timeout=20) as response:
-            google = json.load(response)["google"]
+            google = json.load(response)["google"]  # "ok", "sans_jeton" (Google Tasks not linked yet) or an error
     except urllib.error.HTTPError as e:
         sys.exit(f"ajouter-tache : le dashboard a refusé la tâche ({e.read().decode(errors='replace')[:200]}).")
     except (OSError, ValueError, KeyError) as e:
@@ -49,7 +52,7 @@ def main():
 
     os.makedirs(os.path.dirname(ACTIONS_LOG), exist_ok=True)
     with open(ACTIONS_LOG, "a") as f:
-        f.write(time.strftime("%F %T  ") + f"tâche « {title} »{' pour le ' + date.isoformat() if date else ''} (Google : {google})\n")
+        f.write(time.strftime("%F %T  ") + f"task \"{title}\"{' due ' + date.isoformat() if date else ''} (Google: {google})\n")
     if google == "ok":
         print(f"Fait : « {title} » est dans Google Tasks et sur le dashboard{due_text}.")
     elif google == "sans_jeton":

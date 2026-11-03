@@ -78,7 +78,7 @@ def main():
         done = subprocess.run([link], capture_output=True, text=True, env={})
         check("Traceback" not in done.stderr, "lancée par son lien et sans environnement, la commande trouve spoken_dates", done.stderr)
 
-        recap.FICHIER = path
+        recap.RECAP_FILE = path
         sys.argv = ["recap", "--dire"]
         out = io.StringIO()
         with contextlib.redirect_stdout(out):
@@ -86,12 +86,12 @@ def main():
         check("Détails" not in out.getvalue() and "À dire" not in out.getvalue(), "recap --dire n'écrit que le texte", out.getvalue())
         sys.argv = ["recap"]
 
-        recap.FICHIER = os.path.join(folder, "absent.json")
+        recap.RECAP_FILE = os.path.join(folder, "absent.json")
         for content, text, expected in ((None, "un fichier absent le dit, sans trace d'erreur", "Le récap du jour n'est pas dans iCloud"),
                                         ("{coupé", "un fichier illisible le dit", "illisible"),
                                         ('{"date": "2026-10-31"}', "un fichier incomplet le dit", "illisible")):
             if content is not None:
-                recap.FICHIER = path
+                recap.RECAP_FILE = path
                 with open(path, "w", encoding="utf-8") as f:
                     f.write(content)
             try:

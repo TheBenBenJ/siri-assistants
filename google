@@ -1,25 +1,27 @@
 #!/usr/bin/python3 -I
-# google : ce qu'ask-haiku peut demander à Google, par la passerelle google-pont.py.
+# google: what ask-haiku (Claude Code) may ask of Google, through the local bridge (google-bridge.py).
 #
-#   google mails ["recherche Gmail"]        la boîte de réception par défaut
-#   google mail <n°> [suite]                lit un mail de la dernière liste
-#   google contact "nom"
-#   google agenda [jours]
-#   google drive "mots"
-#   google document <n°> [suite]            lit un fichier de la dernière liste
-#   google taches
-#   google notes ["mot"]                    notes Keep, celles qui sont sensibles sans leur contenu
+#   google mails ["Gmail search"]           the inbox by default
+#   google mail <n> [offset]                reads a mail from the last list
+#   google contact "name"
+#   google agenda [days]
+#   google drive "words"
+#   google document <n> [offset]            reads a file from the last list
+#   google taches                           open tasks
+#   google notes ["word"]                   Keep notes; sensitive ones without their content
 #
-# Ces commandes ne font que proposer ; rien n'est fait tant que l'utilisateur n'a pas dit « oui » au tour suivant :
-#   google repondre <n°> "texte"
-#   google envoyer "adresse, nom ou moi" "objet" "texte"
-#   google brouillon "adresse, nom ou moi" "objet" "texte"
-#   google archiver <n°>
-#   google corbeille <n°>
-#   google rdv "titre" "vendredi 14h" [minutes] ["lieu"]
-#   google annuler-rdv <n°>
+# These only propose; nothing happens until the user says "oui" on the next turn:
+#   google repondre <n> "text"                              reply
+#   google envoyer "address, name or moi" "subject" "text"  send
+#   google brouillon "address, name or moi" "subject" "text" draft
+#   google archiver <n>                                     archive
+#   google corbeille <n>                                    trash
+#   google rdv "title" "vendredi 14h" [minutes] ["place"]   create an event
+#   google annuler-rdv <n>                                  delete an event
 #
-# Confirmer n'est volontairement pas une commande d'ici : seul le script de l'assistant le fait, voir outils.py --confirm.
+# The action words are French because the model is prompted in French and they are the bridge's API (see README).
+# Confirming is deliberately not a command here: only the assistant's script confirms, with tools.py --confirm,
+# so nothing the model reads (a mail, a document) can make it confirm its own proposal.
 import json
 import sys
 import urllib.error
@@ -39,6 +41,7 @@ def main():
     body = {"action": action, "args": dict(zip(ARGUMENTS[action], values))}
     request = urllib.request.Request(ENDPOINT, json.dumps(body).encode(), {"X-Assistant": "1", "Content-Type": "application/json"})
     try:
+        # No proxy: the bridge is on the loopback, and a proxy from the environment must not see these requests.
         with urllib.request.build_opener(urllib.request.ProxyHandler({})).open(request, timeout=90) as response:
             print(response.read().decode())
     except urllib.error.HTTPError as e:
