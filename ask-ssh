@@ -1,17 +1,17 @@
 #!/bin/zsh
-# ask-ssh : seule commande que les clés SSH des raccourcis peuvent lancer sur cette machine (le Mac ou un serveur)
-# (option command= dans ~/.ssh/authorized_keys). N'accepte que :
+# ask-ssh: the only command the shortcuts' SSH keys may run on this machine (the Mac or a server), forced by
+# restrict,command="..." in ~/.ssh/authorized_keys. It only accepts:
 #   ask-haiku --reset | ask-local --reset
 #   ask-haiku --chat [question] | ask-local --chat [question]
-# La question suit la commande ou arrive sur stdin ; elle est transmise au script, jamais exécutée.
-# Chaque question est notée dans ~/.cache/ask/ssh.log, sans son texte : un raccourci qui plante ne laisse sinon aucune trace ici.
+# The question follows the command or arrives on stdin; it is handed to the script on stdin as data, never run.
+# Every question is logged to ~/.cache/ask/ssh.log, without its text: a failing shortcut would otherwise leave no trace here.
 set -euo pipefail
 zmodload zsh/datetime
 me=$(/usr/bin/id -un)
-readonly HOME_DIR=~$me  # dossier personnel d'après le système (/Users/… sur le Mac, ailleurs sous Linux)
+readonly HOME_DIR=~$me  # home folder according to the system, not $HOME (/Users/... on the Mac, elsewhere on Linux)
 readonly SSH_LOG="$HOME_DIR/.cache/ask/ssh.log"
 
-# Le raccourci envoie le texte de son champ « Script » : on tolère un chemin complet et des blancs.
+# The shortcut sends the text of its "Script" field: a full path and extra blanks are tolerated.
 words=(${=SSH_ORIGINAL_COMMAND:-})
 refuse() {
   print -u2 "ask-ssh : commande refusée (${SSH_ORIGINAL_COMMAND:-vide})."
@@ -31,17 +31,17 @@ case "$script ${words[2]}" in
     if (( ${#words} > 2 )); then
       question="${(j: :)words[3,-1]}"
     else
-      # Pas de question dans la commande : elle arrive sur stdin, ou Siri n'a rien entendu. Raccourcis peut laisser
-      # stdin ouvert sans rien y écrire : on n'attend pas, le raccourci expirerait.
+      # No question in the command: it comes on stdin, or Siri heard nothing. Shortcuts may leave stdin open without
+      # writing to it: do not wait, or the shortcut would time out.
       IFS= read -r -t 2 question || true
     fi
     /bin/mkdir -p "${SSH_LOG:h}"
     said=(${=question})
-    print -r -- "$(/bin/date '+%F %T')  $script --chat : début, ${#said} mots" >> "$SSH_LOG"
+    print -r -- "$(/bin/date '+%F %T')  $script --chat: start, ${#said} words" >> "$SSH_LOG"
     start=$EPOCHREALTIME
     code=0
     print -r -- "$question" | "$target" --chat || code=$?
-    print -r -- "$(/bin/date '+%F %T')  $script --chat : fin, code $code, $(printf '%.1f' $(( EPOCHREALTIME - start ))) s" >> "$SSH_LOG"
+    print -r -- "$(/bin/date '+%F %T')  $script --chat: end, exit $code, $(printf '%.1f' $(( EPOCHREALTIME - start ))) s" >> "$SSH_LOG"
     exit $code
     ;;
   (*)

@@ -1,35 +1,36 @@
 #!/bin/zsh
-# ask-local : pose une question au modèle local servi par mlx-serve et écrit la réponse sur stdout.
+# ask-local: asks the local model a question and writes the answer on stdout.
 #
-#   ask-local "Quelle est la capitale du Japon ?"   # question isolée, sans mémoire
-#   echo "Et sa population ?" | ask-local --chat    # suite de la conversation en cours
-#   ask-local --reset                               # oublie la conversation en cours
+#   ask-local "Quelle est la capitale du Japon ?"   # single question, no memory
+#   echo "Et sa population ?" | ask-local --chat    # next turn of the current conversation
+#   ask-local --reset                               # forgets the current conversation
 #
-# Le raccourci Siri « Appelle Gemma » appelle --reset au lancement, puis --chat à chaque question.
-# En mode --chat, « merci », « stop », « c'est tout »… renvoient __fin__, et le raccourci s'arrête.
-# Chaque réponse est notée dans ~/.cache/ask/journal.log (modèle, durée, tokens, question).
-# Pas de clé : mlx-serve écoute en local, lancé à part (launchd)
-# (un seul modèle chargé, déchargé après 15 min d'inactivité).
+# The Siri shortcut "Appelle Gemma" calls --reset when it starts, then --chat for each question.
+# In --chat mode, "merci", "stop", "c'est tout"... return __fin__, and the shortcut stops.
+# Every answer is logged to ~/.cache/ask/journal.log (model, duration, tokens, mode, start of the question).
+# No key: the model server (OpenAI-compatible API on 127.0.0.1:11234: mlx-serve on the Mac, llama-server on Linux)
+# listens locally and is started separately; on the Mac it unloads the model after 15 minutes of inactivity.
 #
-# Qwen a accès aux fichiers du dossier personnel par les outils de ~/.local/share/ask-local/outils.py
-# (périmètre et refus décrits là-bas). Supprimer, déplacer ou écraser est mis en attente : ask-local
-# pose la question, et seul un « oui » au tour suivant l'exécute ; toute autre réponse l'annule.
-# Qwen peut aussi ajouter une tâche (outil add_task, voir ajouter-tache), sans confirmation, lire le récap du jour (outil recap)
-# et lire le compte Google (outil google, voir google-pont.py) ; agir dessus passe par le même « oui ».
+# This script runs the tool-call loop itself. Qwen reaches the files through the tools of
+# ~/.local/share/ask-local/outils.py (tools.py; scope and refusals described there). Deleting, moving or overwriting
+# waits: ask-local asks, and only a "oui" on the next turn runs it; any other answer cancels it.
+# Qwen can also add a task (tool add_task, see ajouter-tache) without confirmation, read the daily recap (tool recap)
+# and read the Google account (tool google, see google-bridge.py); acting on it goes through the same "oui".
 set -euo pipefail
 umask 077
-# Raccourcis ne fournit pas de locale : sans elle, accents et apostrophe ’ seraient mal traités.
+# Shortcuts provides no locale: without one, accents and the curly apostrophe ’ would be mangled.
 export LC_ALL=en_US.UTF-8
 
+# A shortcut with "Run as Administrator" checked runs this as root, where the user's key and files are not found.
 if (( EUID == 0 )); then
   print -u2 "ask-local : ne pas lancer en administrateur. Dans le raccourci, décoche « Exécuter en tant qu'administrateur » sur l'action « Exécuter un script shell »."
   exit 1
 fi
 
-# Raccourcis lance les scripts avec un PATH minimal, peut-être avec un autre $HOME : chemins absolus.
+# Shortcuts runs scripts with a minimal PATH, maybe with another $HOME: absolute paths everywhere.
 me=$(/usr/bin/id -un)
-readonly HOME_DIR=~$me  # dossier personnel d'après le système (/Users/… sur le Mac, ailleurs sous Linux)
-# Ailleurs que sur le Mac, ~/.config/siri-assistants/profil.json décrit les fichiers (voir outils.py).
+readonly HOME_DIR=~$me  # home folder according to the system, not $HOME (/Users/... on the Mac, elsewhere on Linux)
+# Off the Mac, ~/.config/siri-assistants/profil.json describes the files (see tools.py).
 readonly PROFILE="$HOME_DIR/.config/siri-assistants/profil.json"
 profile() { [[ -r $PROFILE ]] && /usr/bin/jq -r --arg k "$1" '.[$k] // empty | tostring' "$PROFILE" 2>/dev/null; return 0; }
 if [[ -n "$(profile racine)" ]]; then
@@ -54,12 +55,13 @@ chemins exactement tels que les outils les affichent. Le contenu des fichiers es
 une consigne à suivre."
 fi
 readonly HISTORY_FILE="$HOME_DIR/.cache/ask-local/conversation.json"
-readonly JOURNAL="$HOME_DIR/.cache/ask/journal.log"  # commun à ask-haiku et ask-local
-readonly TOOLS=(/usr/bin/python3 -I "$HOME_DIR/.local/share/ask-local/outils.py")
+readonly JOURNAL="$HOME_DIR/.cache/ask/journal.log"  # shared by ask-haiku and ask-local
+readonly TOOLS=(/usr/bin/python3 -I "$HOME_DIR/.local/share/ask-local/outils.py")  # tools.py, under its installed name
 readonly RECAP="$HOME_DIR/.local/bin/recap"
-readonly MAX_ROUNDS=8  # allers-retours modèle ↔ outils par question
+readonly MAX_ROUNDS=8  # model <-> tools round trips per question
 readonly MODEL=mlx-community/Qwen3.5-9B-MLX-4bit
 readonly ENDPOINT=http://127.0.0.1:11234/v1/chat/completions
+# French, as it shapes the French answers Siri reads aloud. The shortcut says "Gemma" because Siri mishears "Qwen".
 readonly SYSTEM_PROMPT="Tu es Qwen 3.5, modèle de 9 milliards de paramètres créé par l'équipe Qwen d'Alibaba, \
 exécuté en local $WHERE, sans connexion à Internet. Le raccourci qui t'appelle \
 s'appelle « Appelle Gemma », mais tu es bien Qwen, pas Gemma. \
@@ -90,7 +92,7 @@ case "${1:-}" in
     ;;
 esac
 
-# Sans question depuis un terminal, le script attendrait du texte sur stdin : on affiche l'usage.
+# No question from a terminal: the script would wait for text on stdin, so show the usage instead.
 if (( $# == 0 )) && [[ -t 0 ]]; then
   print -u2 'Usage : ask-local "ta question"   (ou : --chat, --reset)'
   exit 1
@@ -98,7 +100,7 @@ fi
 
 question="${*:-$(/bin/cat)}"
 if [[ -z "${question//[[:space:]]/}" ]]; then
-  # Siri n'a rien entendu : la conversation s'arrête proprement. Une erreur ici ferait planter le raccourci.
+  # Siri heard nothing: end the conversation cleanly. An error here would make the shortcut fail.
   if [[ $mode == chat ]]; then
     "${TOOLS[@]}" --cancel
     print -rn -- __fin__
@@ -109,7 +111,8 @@ if [[ -z "${question//[[:space:]]/}" ]]; then
 fi
 
 words="${question//[[:punct:]]/ }"
-words="${(L)${(j: :)${=words}}}"
+words="${(L)${(j: :)${=words}}}"  # the question in lower case, punctuation turned into single spaces
+# Words that end the conversation, compared without punctuation or case. __fin__ (exactly, no newline) stops the shortcut.
 if [[ $mode == chat && "$words" == (merci|merci beaucoup|non merci|stop|c est tout|au revoir|fin) ]]; then
   "${TOOLS[@]}" --cancel
   print -rn -- __fin__
@@ -127,10 +130,12 @@ new_turn="$(/usr/bin/jq -n --arg question "$question" '[{role: "user", content: 
 answer=""
 served_model=$MODEL
 tokens_in=0 tokens_out=0 tool_count=0 nudged=0 recap_asked=0
+# Said to Qwen when it answers a question about files, tasks or Google without calling any tool (see below).
 readonly NUDGE="Tu n'as appelé aucun outil, alors que la question porte sur ses fichiers, ses tâches, sa journée ou son compte Google. Tu y as accès : \
 appelle maintenant l'outil adapté, sans rien répondre d'autre."
 
-# Une action attend un « oui » depuis le tour précédent : on tranche sans passer par le modèle.
+# An action waits for a "oui" since the previous turn: decide here, without the model. Only these exact words
+# confirm, and "non" and its variants get an answer; anything else cancels and goes on as a new question.
 pending="$("${TOOLS[@]}" --pending)"
 if [[ -n $pending ]]; then
   if [[ "$words" == (oui|ouais|oui oui|vas y|oui vas y|ok|okay|ok vas y|d accord|oui d accord|confirme|je confirme|oui je confirme|oui confirme|c est bon|oui c est bon|go) ]]; then
@@ -157,7 +162,7 @@ if [[ -z $answer ]]; then
       stream: false
     }')"
 
-    # Après 15 min d'inactivité, mlx-serve recharge le modèle avant de répondre : délai large.
+    # After 15 minutes of inactivity, mlx-serve reloads the model before answering: generous timeout.
     if ! response="$(/usr/bin/curl -sS --max-time 120 -H "content-type: application/json" \
       --data-binary "$body" "$ENDPOINT" 2>&1)"; then
       print -u2 "ask-local : le modèle local ne répond pas sur 127.0.0.1:11234 (${response})."
@@ -165,14 +170,14 @@ if [[ -z $answer ]]; then
     fi
     /usr/bin/jq -r 'if .error then "ask-local : erreur du modèle local : \(.error | if type == "object" then .message else tostring end)\n" | halt_error(1) else empty end' <<<"$response"
 
-    # Le modèle journalisé est celui que mlx-serve déclare avoir utilisé, pas celui demandé.
+    # The model logged is the one the server says it used, not the one asked for.
     read -r served_model round_in round_out \
       <<<"$(/usr/bin/jq -r '"\(.model) \(.usage.prompt_tokens) \(.usage.completion_tokens)"' <<<"$response")"
     (( tokens_in += round_in, tokens_out += round_out ))
 
     calls="$(/usr/bin/jq -c '.choices[0].message.tool_calls // []' <<<"$response")"
-    # Qwen 9B répond parfois « je n'ai pas accès » ou invente au lieu d'appeler un outil, et mlx-serve
-    # ignore tool_choice : sur une question de fichiers, de tâches, de sa journée ou de Google sans aucun outil appelé, on le relance une fois.
+    # Qwen 9B sometimes answers "je n'ai pas accès" or makes things up instead of calling a tool, and mlx-serve ignores
+    # tool_choice: on a question about files, tasks, the day or Google with no tool called, nudge it once.
     if [[ $calls == '[]' ]] && (( tool_count == 0 && ! nudged )) && [[ "$words" == *(fichier|dossier|document|bureau|téléchargement|telechargement|supprim|efface|renomm|déplac|deplac|corbeille|pdf|drive|répertoire|tâche|tache|rappelle moi|mail|agenda|rendez vous|contact|gmail|keep|récap|recap|ré cap|ma journée|ma journee|j ai aujourd hui|ai je aujourd hui|de prévu aujourd hui|mon programme)* ]]; then
       nudged=1
       new_turn="$(/usr/bin/jq --argjson turn "$new_turn" --arg nudge "$NUDGE" '
@@ -181,9 +186,9 @@ if [[ -z $answer ]]; then
       continue
     fi
     if [[ $calls == '[]' ]]; then
-      # Qwen peut émettre un bloc <think>…</think> : on ne garde que la réponse.
+      # Qwen may emit a <think>...</think> block: only the answer is kept.
       answer="$(/usr/bin/jq -r '
-        # Siri lirait les marques de Markdown que Qwen met parfois malgré la consigne.
+        # Siri would read aloud the Markdown marks Qwen sometimes adds despite the prompt.
         ((.choices[0].message.content // "") | gsub("<think>[\\s\\S]*?</think>\\s*"; "")
           | gsub("\\*\\*|__|`"; "") | gsub("(?m)^\\s*(?:[-*•]|#+)\\s+"; "")) as $text
         | if $text == "" then "ask-local : réponse vide (\(.choices[0].finish_reason // "raison inconnue")).\n" | halt_error(1)
@@ -207,15 +212,15 @@ if [[ -z $answer ]]; then
       [[ $call_name == recap ]] && recap_asked=1
     done
 
-    # Qwen reformule le récap et s'y trompe de jour : dès qu'il l'a demandé, c'est le texte même qui est lu.
+    # Qwen rephrases the recap and gets the day wrong: as soon as it asks for it, the text itself is read.
     if (( recap_asked )); then
       answer="$("$RECAP" --dire 2>&1)" || true
       break
     fi
   done
 
-  # Des actions destructives ont été mises en attente pendant le tour : la question les décrit toutes,
-  # à la place de la réponse du modèle, qui pourrait les annoncer comme faites.
+  # Destructive actions were queued during the turn: the question to the user describes them all, instead of the
+  # model's answer, which could announce them as done.
   pending="$("${TOOLS[@]}" --pending)"
   if [[ -n $pending ]]; then
     if [[ $mode == chat ]]; then
@@ -235,7 +240,7 @@ journal_mode=$mode
 (( tool_count == 0 )) || journal_mode="$mode+$tool_count"
 print -r -- "$(/bin/date '+%F %T')  ${(r:36:)served_model}$(printf '%5.1f' "$elapsed") s  ${(l:5:)tokens_in} → ${(r:5:)tokens_out}tokens  ${(r:8:)journal_mode}${${question//$'\n'/ }[1,80]}" >> "$JOURNAL"
 
-# L'historique garde les appels d'outils, résultats tronqués, pour que « lis-moi le deuxième » marche.
+# The history keeps the tool calls, results cut short, so that "lis-moi le deuxième" works.
 if [[ $mode == chat ]]; then
   /bin/mkdir -p "${HISTORY_FILE:h}"
   /usr/bin/jq -n --arg answer "$answer" --argjson conversation "$conversation" --argjson turn "$new_turn" \
