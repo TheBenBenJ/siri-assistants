@@ -6,8 +6,8 @@
 #   google-bridge.py --autoriser    # authorize in the browser; OAuth client and refresh token go to the Keychain
 #   google-bridge.py --installer    # writes and loads the launchd agent
 #
-# On Linux, as a systemd service: the OAuth client and token arrive as an encrypted credential
-# (LoadCredentialEncrypted=), a JSON {"app": ..., "token": ...} decrypted for this service only; authorize on the Mac,
+# On Linux, as a systemd service: the OAuth client and token arrive as an encrypted credential named google-bridge
+# (or google-pont, its former name), a JSON {"app": ..., "token": ...} decrypted for this service only; authorize on the Mac,
 # then encrypt that JSON with systemd-creds. ACTIONS_LOG, in the environment, moves the actions log.
 #
 # Why a bridge: the Keychain cannot be read over SSH, and the model must never see the token.
@@ -49,6 +49,8 @@ HOSTS = {f"127.0.0.1:{PORT}", f"localhost:{PORT}"}
 ACTIONS_LOG = os.environ.get("ACTIONS_LOG") or os.path.join(HOME, ".cache/ask/actions.log")
 NOTES_URL = "http://127.0.0.1:8765/notes"  # the dashboard's copy of Keep: Keep has no API for personal accounts
 KEYCHAIN = "ask-google"  # Keychain service (accounts "app" and "token"); other repositories read these items
+# systemd credential IDs (LoadCredentialEncrypted=<id>): the current name, then the one units installed before it use.
+CREDENTIAL_NAMES = ("google-bridge", "google-pont")
 LABEL = f"com.{pwd.getpwuid(os.getuid()).pw_name}.ask-google"  # launchd label of the installed agent
 PENDING_TTL = 600  # a confirmation more than 10 minutes after the question is ignored
 TIMEOUT = 15
@@ -89,11 +91,15 @@ class Refusal(Exception):
 def credential(key):
     """A stored JSON value: "app" (the OAuth client) or "token" (the refresh token). None if absent."""
     if os.environ.get("CREDENTIALS_DIRECTORY"):  # systemd service: no Keychain, the JSON handed over by systemd
-        try:
-            with open(os.path.join(os.environ["CREDENTIALS_DIRECTORY"], "google-pont")) as f:
-                return json.load(f).get(key)
-        except (OSError, ValueError):
-            return None
+        for name in CREDENTIAL_NAMES:  # the first one present is used
+            path = os.path.join(os.environ["CREDENTIALS_DIRECTORY"], name)
+            if os.path.exists(path):
+                try:
+                    with open(path) as f:
+                        return json.load(f).get(key)
+                except (OSError, ValueError):
+                    return None
+        return None
     done = subprocess.run(["/usr/bin/security", "find-generic-password", "-s", KEYCHAIN, "-a", key, "-w"], capture_output=True, text=True)
     try:
         return json.loads(done.stdout) if done.returncode == 0 else None
