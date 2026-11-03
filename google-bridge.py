@@ -1,6 +1,6 @@
 #!/usr/bin/python3 -I
 # google-bridge.py: local bridge between the voice assistants and Google (Gmail, Calendar, Drive, Contacts, Tasks),
-# plus the Keep notes copied by the dashboard. google-pont.py, its former name, is a link to this file.
+# plus the Keep notes copied by the dashboard.
 #
 #   google-bridge.py                # serves on 127.0.0.1:8766 (launchd agent, in the user's session, on the Mac)
 #   google-bridge.py --autoriser    # authorize in the browser; OAuth client and refresh token go to the Keychain
@@ -17,8 +17,7 @@
 # Every action run is logged to ~/.cache/ask/actions.log (or ACTIONS_LOG).
 #
 # The HTTP API (paths, French action words and argument names) is shared with tools.py and the google client. Its
-# answers are read by the model and said back to the user, so they stay French; messages still name google-pont.py,
-# the path existing installs know.
+# answers are read by the model and said back to the user, so they stay French.
 import base64
 import datetime
 import email.message
@@ -122,14 +121,14 @@ def access_token():
         return TOKEN["value"]
     app, token = credential("app"), credential("token")
     if not (app and token):
-        raise Refusal("Google n'est pas encore autorisé : il faut lancer google-pont.py --autoriser.")
+        raise Refusal("Google n'est pas encore autorisé : il faut lancer google-bridge.py --autoriser.")
     body = urllib.parse.urlencode({**app, **token, "grant_type": "refresh_token"}).encode()
     try:
         with open_url(urllib.request.Request(TOKEN_URL, data=body)) as r:
             answer = json.loads(r.read().decode())
     except urllib.error.HTTPError as e:
         if e.code in (400, 401):
-            raise Refusal("Google a retiré l'autorisation : il faut relancer google-pont.py --autoriser.") from e
+            raise Refusal("Google a retiré l'autorisation : il faut relancer google-bridge.py --autoriser.") from e
         raise
     TOKEN.update(value=answer["access_token"], expires=time.time() + answer.get("expires_in", 3000))
     return TOKEN["value"]
@@ -667,7 +666,7 @@ def authorize():
 def install():
     """Writes and (re)loads the launchd agent that keeps the bridge running in the user's session (Mac)."""
     path = os.path.join(HOME, f"Library/LaunchAgents/{LABEL}.plist")
-    log = os.path.join(HOME, ".cache/ask/google-pont.log")  # where the existing agent already writes
+    log = os.path.join(HOME, ".cache/ask/google-bridge.log")
     os.makedirs(os.path.dirname(log), exist_ok=True)
     with open(path, "w") as f:
         f.write(f"""<?xml version="1.0" encoding="UTF-8"?>
@@ -694,7 +693,7 @@ def main():
     elif arg == "--installer":
         install()
     elif arg:
-        sys.exit("Usage : google-pont.py [--autoriser | --installer]")
+        sys.exit("Usage : google-bridge.py [--autoriser | --installer]")
     else:
         http.server.ThreadingHTTPServer(("127.0.0.1", PORT), Bridge).serve_forever()
 

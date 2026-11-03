@@ -58,7 +58,6 @@ Siri cannot hold a conversation with a model of your choice, and a shortcut that
 | `spoken_dates.py` | French spoken dates and times ("vendredi 14h", "demain") to real dates, and back to speech. |
 | `build-shortcuts.py` | Builds and signs the two shortcuts, "Appelle Claude" and "Appelle Gemma". |
 | `tests/` | Offline tests of the bridge (fake Google) and of the recap. |
-| `google-pont.py`, `outils.py` | Compatibility links to `google-bridge.py` and `tools.py`, for installs that use the old paths. |
 | `CONFIDENTIALITE.md` | Privacy notice (French) of the Google OAuth app. |
 
 The dashboard is a separate personal project. This repository only relies on three of its interfaces, described under [Interfaces](#interfaces); point them at your own service.
@@ -149,7 +148,7 @@ They are constants at the top of the scripts: `MODEL` in `ask-haiku` and `ask-lo
 | `~/.cache/ask/actions.log` | Every change made: files, tasks, Google actions (the bridge writes to `ACTIONS_LOG` if set). |
 | `~/.cache/ask-haiku/agent-error.log` | Why Claude Code failed when the fallback answered. |
 | `~/.cache/ask-haiku/`, `~/.cache/ask-local/` | Conversation state, Claude Code session, file actions waiting for a "oui". |
-| `~/.cache/ask/google-pont.log` | The bridge's errors on the Mac (launchd agent). |
+| `~/.cache/ask/google-bridge.log` | The bridge's errors on the Mac (launchd agent). |
 
 Modes in the journal: `single` or `chat`, then, for `ask-haiku`, `+cc` when Claude Code answered (no suffix means the fallback answered) and `+rep` when the script answered a yes or no itself; for `ask-local`, `+N` when N tools were called (a confirmed "oui" counts as one).
 
@@ -202,7 +201,7 @@ These formats are shared with the shortcuts, other repositories or the dashboard
 - **Standard library, `/usr/bin/python3 -I`, absolute paths.** Nothing to install or update on two systems; `-I` (isolated mode) ignores `PYTHON*` variables and user site-packages and adds no folder to the import path, so nothing planted next to a script or in the current folder is imported in its place; Shortcuts runs scripts with a minimal PATH, and possibly another `$HOME`, so the scripts use absolute paths and find the home folder from the system. zsh and jq are built into macOS, where the scripts started.
 - **Refuse root.** With "Run as Administrator" checked, the script ran as root and found neither the key nor the files.
 - **French where it is heard or read by the model.** Prompts, tool definitions, the bridge's action words and argument names, and every answer are French, because they shape what Siri says. They are also an interface (bridge API, conversation history), so they are kept as they are. The bridge's handlers are named after the action words: Python's argument errors, sent back to the model, quote these names.
-- **Names kept for compatibility.** `google-pont.py` and `outils.py` are links to `google-bridge.py` and `tools.py`, because launchd agents, systemd units and installers in other repositories use those paths; a copy of a link is the full file. `ajouter-tache` is the command the models are told to run. The Keychain items, the launchd label, the bridge's port, the profile's former name and keys, the systemd credential's former name and the dashboard's and recap's French keys are read as before.
+- **Names kept for compatibility.** `tools.py` is installed as `~/.local/share/ask-local/outils.py`, the path the assistants call. `ajouter-tache` is the command the models are told to run. The links `google-pont.py` and `outils.py`, kept for the installs of the first days, were removed on 04/11/2026 once no launchd agent, systemd unit or installer used them. The Keychain items, the launchd label, the bridge's port, the profile's former name and keys, the systemd credential's former name and the dashboard's and recap's French keys are read as before.
 
 ## Privacy
 
