@@ -19,13 +19,13 @@ Siri cannot hold a conversation with a model of your choice, and a shortcut that
                                                                   │       --reset | --chat
                                                                   ▼
                                      ask-haiku ──▶ Claude Code, headless (claude -p --bare)
-                                         │           closed list of tools: files, ajouter-tache, google, recap
+                                         │           closed list of tools: files, add-task, google, recap
                                          │           (fallback: Messages API, no tools)
                                      ask-local ──▶ local model, OpenAI-compatible API (127.0.0.1:11234)
                                                      tool-call loop run by the script, tools in tools.py
                                                                   │
                  ┌─ google (Claude) or tool google (Qwen) ──HTTP :8766──▶ google-bridge.py ──▶ Google APIs
-          tools ─┼─ ajouter-tache ──HTTP :8765──▶ dashboard ──▶ Google Tasks
+          tools ─┼─ add-task ──HTTP :8765──▶ dashboard ──▶ Google Tasks
                  └─ recap ──▶ recap JSON file, written by the dashboard
  Siri reads the answer ◀──────── stdout ──────── (then listens again; "merci" or "stop" ends)
 ```
@@ -50,15 +50,15 @@ Siri cannot hold a conversation with a model of your choice, and a shortcut that
 | `ask-ssh` | Forced command of the shortcuts' SSH keys: allows `ask-haiku` or `ask-local` with `--reset` or `--chat`, logs each call without its text. |
 | `ask-haiku` | Claude Haiku through `claude -p --bare`, with a closed list of tools; falls back to the Messages API without tools. `--set-key` stores the API key. |
 | `ask-local` | The local model (Qwen 3.5 9B), with a tool-call loop run by the script, one nudge when it forgets the tools, the recap read verbatim. |
-| `tools.py` | The local model's tools (files, `add_task`, `recap`, `google`) and `--pending`, `--confirm`, `--cancel` for both assistants. Installed as `~/.local/share/ask-local/outils.py`. |
+| `tools.py` | The local model's tools (files, `add_task`, `recap`, `google`) and `--pending`, `--confirm`, `--cancel` for both assistants, which run it from their own folder. |
 | `google-bridge.py` | Local HTTP bridge to Google on 127.0.0.1:8766. Holds the token, serves reads, keeps write proposals in memory. |
 | `google` | Command-line client of the bridge, the form Claude uses (`google mails`, `google repondre 2 "texte"`...). |
-| `ajouter-tache` | Adds a task through the dashboard, which syncs Google Tasks. |
+| `add-task` | Adds a task through the dashboard, which syncs Google Tasks. |
 | `recap` | Reads the daily recap file; `--dire` prints only the text to say. |
 | `spoken_dates.py` | French spoken dates and times ("vendredi 14h", "demain") to real dates, and back to speech. |
 | `build-shortcuts.py` | Builds and signs the two shortcuts, "Appelle Claude" and "Appelle Gemma". |
 | `tests/` | Offline tests of the bridge (fake Google) and of the recap. |
-| `CONFIDENTIALITE.md` | Privacy notice (French) of the Google OAuth app. |
+| `PRIVACY.md` | Privacy notice of the Google OAuth app. |
 
 The dashboard is a separate personal project. This repository only relies on three of its interfaces, described under [Interfaces](#interfaces); point them at your own service.
 
@@ -78,9 +78,8 @@ The dashboard is a separate personal project. This repository only relies on thr
 
 ```sh
 git clone https://github.com/TheBenBenJ/siri-assistants.git && cd siri-assistants
-mkdir -p ~/.local/bin ~/.local/share/ask-local
-ln -s "$PWD"/ask-haiku "$PWD"/ask-local "$PWD"/ask-ssh "$PWD"/ajouter-tache "$PWD"/google "$PWD"/recap ~/.local/bin/
-ln -s "$PWD"/tools.py ~/.local/share/ask-local/outils.py
+mkdir -p ~/.local/bin
+ln -s "$PWD"/ask-haiku "$PWD"/ask-local "$PWD"/ask-ssh "$PWD"/add-task "$PWD"/google "$PWD"/recap ~/.local/bin/
 ask-haiku --set-key                 # Anthropic API key, stored in ~/.config/ask-haiku/api-key (600)
 ./google-bridge.py --autoriser      # authorize in the browser; client and token go to the Keychain
 ./google-bridge.py --installer      # launchd agent that keeps the bridge running in your session
@@ -99,7 +98,7 @@ The Mac must be awake for the shortcuts to work.
 
 Use a dedicated account for the assistants and a separate system account for the bridge.
 
-1. Clone this repository at a pinned commit in the assistants' home. Link `ask-haiku`, `ask-local`, `ask-ssh`, `ajouter-tache`, `google` and `recap` into `~/.local/bin/`, and `tools.py` as `~/.local/share/ask-local/outils.py`. Use links, not copies: the Python commands find `spoken_dates.py` next to their real path.
+1. Clone this repository at a pinned commit in the assistants' home. Link `ask-haiku`, `ask-local`, `ask-ssh`, `add-task`, `google` and `recap` into `~/.local/bin/`. Use links, not copies: the scripts find `tools.py` and `spoken_dates.py` next to their real path.
 2. Install Claude Code for that account, store the API key in `~/.config/ask-haiku/api-key` (mode 600) and write the [profile](#configuration).
 3. Add the shortcuts' keys to that account's `~/.ssh/authorized_keys`, restricted to its `ask-ssh` as above.
 4. Run the local model server on 127.0.0.1:11234.
@@ -136,7 +135,7 @@ Off the Mac, search goes by name, within 20 seconds, as there is no Spotlight an
 
 ### Other settings
 
-They are constants at the top of the scripts: `MODEL` in `ask-haiku` and `ask-local`, `ENDPOINT` in `ask-local` (model server), `ajouter-tache` (dashboard) and `google` (bridge), `BRIDGE` in `tools.py`, `NOTES_URL` and `SCOPES` in `google-bridge.py`, and `RECAP_FILE`'s default in `recap`.
+They are constants at the top of the scripts: `MODEL` in `ask-haiku` and `ask-local`, `ENDPOINT` in `ask-local` (model server), `add-task` (dashboard) and `google` (bridge), `BRIDGE` in `tools.py`, `NOTES_URL` and `SCOPES` in `google-bridge.py`, and `RECAP_FILE`'s default in `recap`.
 
 ### Files and logs
 
@@ -201,11 +200,11 @@ These formats are shared with the shortcuts, other repositories or the dashboard
 - **Standard library, `/usr/bin/python3 -I`, absolute paths.** Nothing to install or update on two systems; `-I` (isolated mode) ignores `PYTHON*` variables and user site-packages and adds no folder to the import path, so nothing planted next to a script or in the current folder is imported in its place; Shortcuts runs scripts with a minimal PATH, and possibly another `$HOME`, so the scripts use absolute paths and find the home folder from the system. zsh and jq are built into macOS, where the scripts started.
 - **Refuse root.** With "Run as Administrator" checked, the script ran as root and found neither the key nor the files.
 - **French where it is heard or read by the model.** Prompts, tool definitions, the bridge's action words and argument names, and every answer are French, because they shape what Siri says. They are also an interface (bridge API, conversation history), so they are kept as they are. The bridge's handlers are named after the action words: Python's argument errors, sent back to the model, quote these names.
-- **Names kept for compatibility.** `tools.py` is installed as `~/.local/share/ask-local/outils.py`, the path the assistants call. `ajouter-tache` is the command the models are told to run. The links `google-pont.py` and `outils.py`, kept for the installs of the first days, were removed on 04/11/2026 once no launchd agent, systemd unit or installer used them. The Keychain items, the launchd label, the bridge's port, the profile's former name and keys, the systemd credential's former name and the dashboard's and recap's French keys are read as before.
+- **Names kept for compatibility.** The Keychain items, the launchd label, the bridge's port, the profile's former name and keys, the systemd credential's former name and the dashboard's and recap's French keys are read as before. Renamed on 4 November 2026, once no installer, unit or agent used the old names: `ajouter-tache` became `add-task`, `CONFIDENTIALITE.md` became `PRIVACY.md`; the links `google-pont.py` and `outils.py` are gone, and the scripts find `tools.py` next to them instead of `~/.local/share/ask-local/outils.py`.
 
 ## Privacy
 
-With the local model, nothing leaves the host. With Claude, the question and what Claude reads to answer it are sent to Anthropic. Google data is fetched on demand; what the assistants read stays in the conversation state and logs on the host (see [Files and logs](#files-and-logs)). The privacy notice of the Google OAuth app is in [CONFIDENTIALITE.md](CONFIDENTIALITE.md) (French).
+With the local model, nothing leaves the host. With Claude, the question and what Claude reads to answer it are sent to Anthropic. Google data is fetched on demand; what the assistants read stays in the conversation state and logs on the host (see [Files and logs](#files-and-logs)). The privacy notice of the Google OAuth app is in [PRIVACY.md](PRIVACY.md).
 
 ## License
 

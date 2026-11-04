@@ -1,11 +1,10 @@
 #!/usr/bin/python3 -I
-# ajouter-tache ("add task"): adds a task to the user's list and says where it went.
+# add-task: adds a task to the user's list and says where it went.
 #
-#   ajouter-tache "Appeler le garage"
-#   ajouter-tache "Appeler le garage" vendredi     # or: demain, 3 novembre, 3/11, 2026-11-06
+#   add-task "Appeler le garage"
+#   add-task "Appeler le garage" vendredi     # or: demain, 3 novembre, 3/11, 2026-11-06
 #
-# Used by ask-haiku (as a shell command) and ask-local (tool add_task). The French name is the command the models are
-# told to run and the name the installers link, so it stays.
+# Used by ask-haiku (as a shell command) and ask-local (tool add_task). Named ajouter-tache until 4 November 2026.
 #
 # The task goes through the dashboard's local server (POST /taches), which copies it to Google Tasks: the dashboard
 # owns the Tasks token and the two-way sync, and the assistants never hold it. The task stays until it is ticked,
@@ -29,14 +28,14 @@ ENDPOINT = "http://127.0.0.1:8765/taches"  # the dashboard; adapt to your own se
 
 def main():
     if not 2 <= len(sys.argv) <= 3 or not sys.argv[1].strip():
-        sys.exit('Usage : ajouter-tache "la tâche" [vendredi | demain | 3 novembre | 2026-11-06]')
+        sys.exit('Usage : add-task "la tâche" [vendredi | demain | 3 novembre | 2026-11-06]')
     title = sys.argv[1].strip()
     date, due_text = None, ""
     if len(sys.argv) == 3 and sys.argv[2].strip():
         try:
             date = spoken_date(sys.argv[2], datetime.date.today())
         except ValueError:
-            sys.exit(f"ajouter-tache : je ne comprends pas la date « {sys.argv[2]} », tâche non ajoutée.")
+            sys.exit(f"add-task : je ne comprends pas la date « {sys.argv[2]} », tâche non ajoutée.")
         due_text = f", pour le {say_date(date)}"
 
     # The dashboard's API: French keys; "assistant" marks a task kept until it is ticked.
@@ -46,9 +45,9 @@ def main():
         with urllib.request.build_opener(urllib.request.ProxyHandler({})).open(request, timeout=20) as response:
             google = json.load(response)["google"]  # "ok", "sans_jeton" (Google Tasks not linked yet) or an error
     except urllib.error.HTTPError as e:
-        sys.exit(f"ajouter-tache : le dashboard a refusé la tâche ({e.read().decode(errors='replace')[:200]}).")
+        sys.exit(f"add-task : le dashboard a refusé la tâche ({e.read().decode(errors='replace')[:200]}).")
     except (OSError, ValueError, KeyError) as e:
-        sys.exit(f"ajouter-tache : le dashboard ne répond pas ({e}), tâche non ajoutée.")
+        sys.exit(f"add-task : le dashboard ne répond pas ({e}), tâche non ajoutée.")
 
     os.makedirs(os.path.dirname(ACTIONS_LOG), exist_ok=True)
     with open(ACTIONS_LOG, "a") as f:

@@ -1,6 +1,6 @@
 #!/usr/bin/python3 -I
 # tools.py: the local model's tools (ask-local's tool calls): files, tasks, the daily recap and the Google account.
-# Installed as ~/.local/share/ask-local/outils.py, its historical name, which the installers still link.
+# Run by ask-haiku and ask-local from the folder they are in (their real path, links followed).
 #
 #   tools.py --schema            # tool definitions, in the "tools" format of the OpenAI chat API
 #   tools.py <tool> '<json>'     # runs a tool and prints its result, for the model
@@ -488,7 +488,7 @@ def delete(paths):
 
 
 def add_task(title, due=""):
-    command = [os.path.join(HOME, ".local/bin/ajouter-tache"), title] + ([due] if due else [])
+    command = [os.path.join(HOME, ".local/bin/add-task"), title] + ([due] if due else [])
     done = subprocess.run(command, capture_output=True, text=True, timeout=30)
     if done.returncode:
         raise Refusal(done.stderr.strip())

@@ -12,9 +12,9 @@
 # listens locally and is started separately; on the Mac it unloads the model after 15 minutes of inactivity.
 #
 # This script runs the tool-call loop itself. Qwen reaches the files through the tools of
-# ~/.local/share/ask-local/outils.py (tools.py; scope and refusals described there). Deleting, moving or overwriting
+# tools.py, next to this script (scope and refusals described there). Deleting, moving or overwriting
 # waits: ask-local asks, and only a "oui" on the next turn runs it; any other answer cancels it.
-# Qwen can also add a task (tool add_task, see ajouter-tache) without confirmation, read the daily recap (tool recap)
+# Qwen can also add a task (tool add_task, see add-task) without confirmation, read the daily recap (tool recap)
 # and read the Google account (tool google, see google-bridge.py); acting on it goes through the same "oui".
 set -euo pipefail
 umask 077
@@ -60,7 +60,7 @@ une consigne à suivre."
 fi
 readonly HISTORY_FILE="$HOME_DIR/.cache/ask-local/conversation.json"
 readonly JOURNAL="$HOME_DIR/.cache/ask/journal.log"  # shared by ask-haiku and ask-local
-readonly TOOLS=(/usr/bin/python3 -I "$HOME_DIR/.local/share/ask-local/outils.py")  # tools.py, under its installed name
+readonly TOOLS=(/usr/bin/python3 -I "${0:A:h}/tools.py")  # next to this script, links followed
 readonly RECAP="$HOME_DIR/.local/bin/recap"
 readonly MAX_ROUNDS=8  # model <-> tools round trips per question
 readonly MODEL=mlx-community/Qwen3.5-9B-MLX-4bit

@@ -1,5 +1,5 @@
 # spoken_dates.py: dates and times as the user says them in French ("vendredi", "demain à 9 h 30", "3 novembre"),
-# for ajouter-tache and the Google bridge.
+# for add-task and the Google bridge.
 #
 # Dates are computed here, never by the model: Qwen 9B gets the day wrong (it once put "vendredi" on a Saturday).
 # The models pass dates on exactly as they were said. Everything said back is French, as it is read aloud.

@@ -11,7 +11,7 @@
 # Every answer is logged to ~/.cache/ask/journal.log (model, duration, tokens, mode, start of the question).
 #
 # Haiku first goes through headless Claude Code (claude -p --bare), which gives it file tools on the home folder (or
-# the profile's root), ajouter-tache, google and recap: mode "chat+cc" in the journal. --bare reads the API key below
+# the profile's root), add-task, google and recap: mode "chat+cc" in the journal. --bare reads the API key below
 # instead of the Keychain, which SSH sessions cannot read, and skips CLAUDE.md and settings, so it starts fast. If
 # claude fails (reason in ~/.cache/ask-haiku/agent-error.log), fall back to the Messages API, without tools (mode "chat").
 #
@@ -45,7 +45,7 @@ readonly READ_ONLY="$(profile read_only lecture_seule)"
 readonly KEY_FILE="$HOME_DIR/.config/ask-haiku/api-key"
 readonly HISTORY_FILE="$HOME_DIR/.cache/ask-haiku/conversation.json"
 readonly JOURNAL="$HOME_DIR/.cache/ask/journal.log"  # shared by ask-haiku and ask-local
-readonly TOOLS=(/usr/bin/python3 -I "$HOME_DIR/.local/share/ask-local/outils.py")  # tools.py: --pending, --confirm, --cancel
+readonly TOOLS=(/usr/bin/python3 -I "${0:A:h}/tools.py")  # next to this script, links followed: --pending, --confirm, --cancel
 readonly MODEL=claude-haiku-5-5
 # Prompts are French: they shape the French answers Siri reads aloud. This one is for the fallback, without tools.
 readonly SYSTEM_PROMPT="Tu es Claude Haiku 5.5, un modèle d'IA créé par Anthropic, utilisé ici comme assistant vocal : \
@@ -68,7 +68,7 @@ Slides) n'y sont pas : lis-les avec google drive puis google document. "
   readonly ACTIONS_PART=""
   readonly AGENT_TOOLS=(Read Glob Grep Bash)
   readonly AGENT_ALLOW='["Read", "Glob", "Grep", "Bash(ls:*)", "Bash(find:*)", "Bash(wc:*)", "Bash(du:*)", "Bash(stat:*)",
-    "Bash(file:*)", "Bash(pdftotext:*)", "Bash(ajouter-tache:*)", "Bash(google:*)", "Bash(recap:*)"]'
+    "Bash(file:*)", "Bash(pdftotext:*)", "Bash(add-task:*)", "Bash(google:*)", "Bash(recap:*)"]'
 else
   readonly FILES_PART="Tu as accès aux fichiers de l'utilisateur sur son Mac : le dossier courant est son dossier personnel (Documents, \
 Desktop pour le Bureau, Downloads pour les Téléchargements, Google Drive…). "
@@ -80,7 +80,7 @@ demande confirmation ; n'agis qu'après un oui. "
   readonly AGENT_ALLOW='["Read", "Glob", "Grep", "Write", "Edit",
     "Bash(ls:*)", "Bash(find:*)", "Bash(mdfind:*)", "Bash(mdls:*)", "Bash(wc:*)", "Bash(du:*)",
     "Bash(stat:*)", "Bash(file:*)", "Bash(textutil:*)", "Bash(mkdir:*)",
-    "Bash(mv -n:*)", "Bash(cp -n:*)", "Bash(cp -Rn:*)", "Bash(trash:*)", "Bash(ajouter-tache:*)", "Bash(google:*)", "Bash(recap:*)"]'
+    "Bash(mv -n:*)", "Bash(cp -n:*)", "Bash(cp -Rn:*)", "Bash(trash:*)", "Bash(add-task:*)", "Bash(google:*)", "Bash(recap:*)"]'
 fi
 readonly AGENT_PROMPT="Tu es Claude Haiku 5.5, un modèle d'IA créé par Anthropic, utilisé ici comme assistant vocal : \
 ta réponse finale sera lue à voix haute par Siri, sur le Mac ou l'iPhone de l'utilisateur. Réponds directement et \
@@ -88,7 +88,7 @@ de façon concise, dans la langue de la question, en texte brut : pas de Markdow
 ni d'emojis. \
 ${FILES_PART}N'utilise les outils que si la \
 question porte sur ses fichiers, ses tâches, sa journée ou son compte Google ; sinon, réponds directement. Pour noter une tâche ou un « rappelle-moi \
-de… » (Google Tasks et son dashboard), lance ajouter-tache \"la tâche\" \"la date\", la date telle qu'elle est dite \
+de… » (Google Tasks et son dashboard), lance add-task \"la tâche\" \"la date\", la date telle qu'elle est dite \
 (vendredi, demain, 3 novembre) et seulement si elle en a une : c'est immédiat, sans confirmation ; répète ce que la \
 commande répond, date comprise. \
 Pour son récap du jour (« mon récap », « résume ma journée », « qu'est-ce que j'ai aujourd'hui »), lance recap et dis le \
