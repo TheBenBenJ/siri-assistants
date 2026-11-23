@@ -1,7 +1,7 @@
 #!/usr/bin/python3 -I
 """tools.py: the local model's tools (ask-local's tool calls): files, tasks, the daily recap and the Google account.
 
-Run by ask-haiku and ask-local from the folder they are in (their real path, links followed):
+Run by ask-gemini and ask-local from the folder they are in (their real path, links followed):
   tools.py --schema            tool definitions, in the "tools" format of the OpenAI chat API
   tools.py <tool> '<json>'     runs a tool and prints its result, for the model
   tools.py --pending           describes what waits for the user's "oui", if anything
@@ -11,6 +11,7 @@ Run by ask-haiku and ask-local from the folder they are in (their real path, lin
 Implementation lives in the sibling package tools_lib/. This entrypoint preserves the CLI interface
 and public re-exports for callers and offline tests.
 """
+
 import json
 import os
 import subprocess

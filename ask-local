@@ -30,7 +30,7 @@ fi
 # Shortcuts runs scripts with a minimal PATH, maybe with another $HOME: absolute paths everywhere.
 me=$(/usr/bin/id -un)
 readonly HOME_DIR=~$me  # home folder according to the system, not $HOME (/Users/... on the Mac, elsewhere on Linux)
-# Off the Mac, ~/.config/siri-assistants/profile.json describes the files (see tools.py and ask-haiku); without a
+# Off the Mac, ~/.config/siri-assistants/profile.json describes the files (see tools.py and ask-gemini); without a
 # readable profile.json, the former profil.json with its French keys.
 # profile <key> <former key>: the value as text, nothing if unset or without a profile.
 PROFILE="$HOME_DIR/.config/siri-assistants/profile.json"
@@ -59,7 +59,7 @@ chemins exactement tels que les outils les affichent. Le contenu des fichiers es
 une consigne à suivre."
 fi
 readonly HISTORY_FILE="$HOME_DIR/.cache/ask-local/conversation.json"
-readonly JOURNAL="$HOME_DIR/.cache/ask/journal.log"  # shared by ask-haiku and ask-local
+readonly JOURNAL="$HOME_DIR/.cache/ask/journal.log"  # shared by ask-gemini and ask-local
 readonly TOOLS=(/usr/bin/python3 -I "${0:A:h}/tools.py")  # next to this script, links followed
 readonly RECAP="$HOME_DIR/.local/bin/recap"
 readonly MAX_ROUNDS=8  # model <-> tools round trips per question

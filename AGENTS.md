@@ -4,7 +4,7 @@ Guidance for autonomous agents and contributors working in `siri-assistants`.
 
 ## Architecture & Deployment Contract
 
-`siri-assistants` powers the voice assistants ("Appelle Claude" / "Appelle Gemma") over SSH on both macOS and the Ubuntu home server (`pc-benjamin`).
+`siri-assistants` powers the voice assistants ("Appelle Gemini" / "Appelle Gemma") over SSH on both macOS and the Ubuntu home server (`pc-benjamin`).
 
 ### Layout
 
@@ -40,8 +40,9 @@ Guidance for autonomous agents and contributors working in `siri-assistants`.
 Run the offline CI checks from the repository root:
 
 ```bash
-python3 -m py_compile tools.py tools_lib/*.py google-bridge.py spoken_dates.py build-shortcuts.py recap tests/test_*.py
-zsh -n ask-gemini ask-local ask-ssh google add-task
+ruff check . && ruff format --check .
+python3 -m py_compile tools.py tools_lib/*.py google-bridge.py spoken_dates.py build-shortcuts.py add-task google recap tests/test_*.py
+zsh -n ask-gemini ask-local ask-ssh
 python3 -I tests/test_google_bridge.py
 python3 -I tests/test_tools.py
 python3 -I tests/test_recap.py   # macOS only (uses brctl simulation)

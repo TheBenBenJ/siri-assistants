@@ -4,7 +4,7 @@
 #   add-task "Appeler le garage"
 #   add-task "Appeler le garage" vendredi     # or: demain, 3 novembre, 3/11, 2026-11-06
 #
-# Used by ask-haiku (as a shell command) and ask-local (tool add_task). Named ajouter-tache until 4 November 2026.
+# Used by ask-gemini (as a shell command) and ask-local (tool add_task). Named ajouter-tache until 4 November 2026.
 #
 # The task goes through the dashboard's local server (POST /taches), which copies it to Google Tasks: the dashboard
 # owns the Tasks token and the two-way sync, and the assistants never hold it. The task stays until it is ticked,
@@ -40,7 +40,9 @@ def main():
 
     # The dashboard's API: French keys; "assistant" marks a task kept until it is ticked.
     body = {"action": "ajouter", "assistant": True, "libelle": title, "echeance": date.isoformat() if date else ""}
-    request = urllib.request.Request(ENDPOINT, json.dumps(body).encode(), {"X-Dashboard": "1", "Content-Type": "application/json"})
+    request = urllib.request.Request(
+        ENDPOINT, json.dumps(body).encode(), {"X-Dashboard": "1", "Content-Type": "application/json"}
+    )
     try:
         with urllib.request.build_opener(urllib.request.ProxyHandler({})).open(request, timeout=20) as response:
             google = json.load(response)["google"]  # "ok", "sans_jeton" (Google Tasks not linked yet) or an error
@@ -51,13 +53,18 @@ def main():
 
     os.makedirs(os.path.dirname(ACTIONS_LOG), exist_ok=True)
     with open(ACTIONS_LOG, "a") as f:
-        f.write(time.strftime("%F %T  ") + f"task \"{title}\"{' due ' + date.isoformat() if date else ''} (Google: {google})\n")
+        f.write(
+            time.strftime("%F %T  ")
+            + f'task "{title}"{" due " + date.isoformat() if date else ""} (Google: {google})\n'
+        )
     if google == "ok":
         print(f"Fait : « {title} » est dans Google Tasks et sur le dashboard{due_text}.")
     elif google == "sans_jeton":
         print(f"Fait : « {title} » est sur le dashboard{due_text}. Google Tasks n'est pas encore relié.")
     else:
-        print(f"Fait : « {title} » est sur le dashboard{due_text}. Google Tasks ne répond pas : elle y sera recopiée dès que possible.")
+        print(
+            f"Fait : « {title} » est sur le dashboard{due_text}. Google Tasks ne répond pas : elle y sera recopiée dès que possible."
+        )
 
 
 if __name__ == "__main__":

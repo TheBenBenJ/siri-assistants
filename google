@@ -1,5 +1,5 @@
 #!/usr/bin/python3 -I
-# google: what ask-haiku (Claude Code) may ask of Google, through the local bridge (google-bridge.py).
+# google: what ask-gemini (Antigravity / Claude Code) may ask of Google, through the local bridge (google-bridge.py).
 #
 #   google mails ["Gmail search"]           the inbox by default
 #   google mail <n> [offset]                reads a mail from the last list
@@ -28,9 +28,23 @@ import urllib.error
 import urllib.request
 
 ENDPOINT = "http://127.0.0.1:8766/action"
-ARGUMENTS = {"mails": ["requete"], "mail": ["numero", "suite"], "contact": ["requete"], "agenda": ["jours"], "drive": ["requete"], "document": ["numero", "suite"],
-             "taches": [], "notes": ["requete"], "repondre": ["numero", "texte"], "envoyer": ["a", "objet", "texte"], "brouillon": ["a", "objet", "texte"],
-             "archiver": ["numero"], "corbeille": ["numero"], "rdv": ["titre", "quand", "duree", "lieu"], "annuler-rdv": ["numero"]}
+ARGUMENTS = {
+    "mails": ["requete"],
+    "mail": ["numero", "suite"],
+    "contact": ["requete"],
+    "agenda": ["jours"],
+    "drive": ["requete"],
+    "document": ["numero", "suite"],
+    "taches": [],
+    "notes": ["requete"],
+    "repondre": ["numero", "texte"],
+    "envoyer": ["a", "objet", "texte"],
+    "brouillon": ["a", "objet", "texte"],
+    "archiver": ["numero"],
+    "corbeille": ["numero"],
+    "rdv": ["titre", "quand", "duree", "lieu"],
+    "annuler-rdv": ["numero"],
+}
 
 
 def main():
@@ -39,7 +53,9 @@ def main():
     if action not in ARGUMENTS or len(values) > len(ARGUMENTS[action]):
         sys.exit("Usage : google " + " | ".join(ARGUMENTS))
     body = {"action": action, "args": dict(zip(ARGUMENTS[action], values))}
-    request = urllib.request.Request(ENDPOINT, json.dumps(body).encode(), {"X-Assistant": "1", "Content-Type": "application/json"})
+    request = urllib.request.Request(
+        ENDPOINT, json.dumps(body).encode(), {"X-Assistant": "1", "Content-Type": "application/json"}
+    )
     try:
         # No proxy: the bridge is on the loopback, and a proxy from the environment must not see these requests.
         with urllib.request.build_opener(urllib.request.ProxyHandler({})).open(request, timeout=90) as response:

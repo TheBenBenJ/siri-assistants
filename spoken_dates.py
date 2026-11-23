@@ -8,7 +8,20 @@ import re
 import unicodedata
 
 WEEKDAYS = ["lundi", "mardi", "mercredi", "jeudi", "vendredi", "samedi", "dimanche"]
-MONTHS = ["janvier", "février", "mars", "avril", "mai", "juin", "juillet", "août", "septembre", "octobre", "novembre", "décembre"]
+MONTHS = [
+    "janvier",
+    "février",
+    "mars",
+    "avril",
+    "mai",
+    "juin",
+    "juillet",
+    "août",
+    "septembre",
+    "octobre",
+    "novembre",
+    "décembre",
+]
 DAY_OFFSETS = {"aujourd hui": 0, "soir": 0, "matin": 0, "demain": 1, "apres demain": 2}
 FILLER_WORDS = {"le", "la", "a", "pour", "ce", "cette", "prochain", "prochaine", "d", "du", "au"}
 CLOCK_TIME = re.compile(r"(?<![\d/-])(\d{1,2})\s*(?:heures?|h|:)\s*(\d{2})?(?!\d)")
@@ -53,10 +66,10 @@ def spoken_moment(text, today):
     noon = NOON_OR_MIDNIGHT.search(text)
     if found:
         hour = datetime.time(int(found[1]), int(found[2] or 0))  # ValueError if the time does not exist
-        text = text[:found.start()] + " " + text[found.end():]
+        text = text[: found.start()] + " " + text[found.end() :]
     elif noon:
         hour = datetime.time(12 if noon[1] == "midi" else 0)
-        text = text[:noon.start()] + " " + text[noon.end():]
+        text = text[: noon.start()] + " " + text[noon.end() :]
     rest = text.strip() if re.fullmatch(r"\s*\d{4}-\d{2}-\d{2}\s*", text) else words_of(text)
     return (spoken_date(rest, today) if rest else today), hour
 

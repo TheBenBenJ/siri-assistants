@@ -43,7 +43,7 @@ readonly FILES_ROOT="${$(profile root racine):-$HOME_DIR}"
 readonly READ_ONLY="$(profile read_only lecture_seule)"
 readonly KEY_FILE="$HOME_DIR/.config/ask-haiku/api-key"
 readonly HISTORY_FILE="$HOME_DIR/.cache/ask-haiku/conversation.json"
-readonly JOURNAL="$HOME_DIR/.cache/ask/journal.log"  # shared by ask-haiku and ask-local
+readonly JOURNAL="$HOME_DIR/.cache/ask/journal.log"  # shared by ask-gemini and ask-local
 readonly TOOLS=(/usr/bin/python3 -I "${0:A:h}/tools.py")  # next to this script, links followed: --pending, --confirm, --cancel
 readonly MODEL=claude-haiku-5-5
 # Prompts are French: they shape the French answers Siri reads aloud. This one is for the fallback, without tools.
@@ -132,7 +132,7 @@ case "${1:-}" in
     read -rs "key?Clé API Anthropic : " || true
     print
     if [[ -z "${key:-}" ]]; then
-      print -u2 "ask-haiku : clé vide, rien n'a été enregistré."
+      print -u2 "ask-gemini : clé vide, rien n'a été enregistré."
       exit 1
     fi
     /bin/mkdir -p "${KEY_FILE:h}"
@@ -180,7 +180,7 @@ if [[ $mode == chat && "$words" == (merci|merci beaucoup|non merci|stop|c est to
 fi
 
 if [[ $PROVIDER == claude && ! -r "$KEY_FILE" ]]; then
-  print -u2 "ask-haiku : clé API absente ou illisible ($KEY_FILE). Pour l'enregistrer : ask-haiku --set-key"
+  print -u2 "ask-gemini : clé API absente ou illisible ($KEY_FILE). Pour l'enregistrer : ask-gemini --set-key"
   exit 1
 fi
 zmodload zsh/datetime
@@ -321,7 +321,7 @@ fi
 
 # --- 3. Fallback: the Messages API directly, without tools ---------------------------------------
 if [[ ! -r "$KEY_FILE" ]]; then
-  print -u2 "ask-haiku : Antigravity indisponible et clé API Anthropic absente ($KEY_FILE)."
+  print -u2 "ask-gemini : Antigravity indisponible et clé API Anthropic absente ($KEY_FILE)."
   exit 1
 fi
 api_key="$(<"$KEY_FILE")"
@@ -351,11 +351,11 @@ elapsed=$(( EPOCHREALTIME - start ))
 
 # Haiku 5.5 thinks by default: the answer may start with "thinking" blocks; only "text" blocks are read.
 answer="$(/usr/bin/jq -r '
-  if .type == "error" then "ask-haiku : erreur API : \(.error.message)\n" | halt_error(1)
+  if .type == "error" then "ask-gemini : erreur API : \(.error.message)\n" | halt_error(1)
   elif .stop_reason == "refusal" then "Haiku a refusé de répondre à cette question."
   else
     ([.content[] | select(.type == "text") | .text] | join("")) as $text
-    | if $text == "" then "ask-haiku : réponse vide (stop_reason : \(.stop_reason)).\n" | halt_error(1)
+    | if $text == "" then "ask-gemini : réponse vide (stop_reason : \(.stop_reason)).\n" | halt_error(1)
       elif .stop_reason == "max_tokens" then "\($text)… (réponse tronquée)"
       else $text end
   end' <<<"$response")"

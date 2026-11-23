@@ -1,4 +1,5 @@
 """Path normalization, tolerant matching, and scope enforcement for tools.py."""
+
 import os
 import unicodedata
 
@@ -28,10 +29,11 @@ def tolerant(path):
             try:
                 names_here = os.listdir(current)
             except OSError:
-                return os.path.join(current, *parts[parts.index(part):])
+                return os.path.join(current, *parts[parts.index(part) :])
             low = loose(part)
-            matches = [n for n in names_here if loose(n) == low] or \
-                      [n for n in names_here if loose(os.path.splitext(n)[0]) == low]
+            matches = [n for n in names_here if loose(n) == low] or [
+                n for n in names_here if loose(os.path.splitext(n)[0]) == low
+            ]
             if len(matches) == 1:
                 candidate = os.path.join(current, matches[0])
         current = candidate
@@ -41,8 +43,16 @@ def tolerant(path):
 def show(path):
     """A path as the model sees it: ~/... on the Mac, relative to the root elsewhere."""
     if not cfg.AT_HOME:
-        return "la racine" if path == cfg.ROOT else os.path.relpath(path, cfg.ROOT) if path.startswith(cfg.ROOT + "/") else path
-    return "~" if path == cfg.HOME else "~/" + os.path.relpath(path, cfg.HOME) if path.startswith(cfg.HOME + "/") else path
+        return (
+            "la racine"
+            if path == cfg.ROOT
+            else os.path.relpath(path, cfg.ROOT)
+            if path.startswith(cfg.ROOT + "/")
+            else path
+        )
+    return (
+        "~" if path == cfg.HOME else "~/" + os.path.relpath(path, cfg.HOME) if path.startswith(cfg.HOME + "/") else path
+    )
 
 
 def resolve(path, must_exist=True):

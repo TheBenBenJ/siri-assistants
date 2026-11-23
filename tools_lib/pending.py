@@ -1,4 +1,5 @@
 """Pending confirmation queue and Google bridge HTTP client for tools.py."""
+
 import json
 import os
 import shutil
@@ -13,7 +14,9 @@ from tools_lib.paths import names, resolve, show
 
 def bridge(path, body=None, timeout=90):
     """Call to the Google bridge; Google proposals live there, out of the model's reach."""
-    request = urllib.request.Request(cfg.BRIDGE + path, json.dumps(body or {}).encode(), {"X-Assistant": "1", "Content-Type": "application/json"})
+    request = urllib.request.Request(
+        cfg.BRIDGE + path, json.dumps(body or {}).encode(), {"X-Assistant": "1", "Content-Type": "application/json"}
+    )
     try:
         with urllib.request.build_opener(urllib.request.ProxyHandler({})).open(request, timeout=timeout) as response:
             return response.read().decode()
@@ -25,7 +28,7 @@ def bridge_quiet(path):
     """For --pending, --confirm and --cancel: with no bridge running, nothing waits there."""
     try:
         return bridge(path, timeout=30)
-    except (OSError, cfg.Refusal):
+    except OSError, cfg.Refusal:
         return ""
 
 
@@ -34,7 +37,7 @@ def load_pending():
     try:
         with open(cfg.PENDING_FILE) as f:
             pending = json.load(f)
-    except (OSError, ValueError):
+    except OSError, ValueError:
         return None
     if time.time() - pending.get("time", 0) > cfg.PENDING_TTL or "actions" not in pending:
         os.remove(cfg.PENDING_FILE)

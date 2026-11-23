@@ -12,6 +12,7 @@ Each device's SSH key (one per device, created by Shortcuts) must be in that mac
 restricted to ask-ssh. The signed .shortcut files are written next to this file: open them to import them.
 Needs macOS, for `shortcuts sign`. Names and texts are French: they are what Siri hears and says.
 """
+
 import getpass
 import plistlib
 import subprocess
@@ -57,9 +58,14 @@ def text_with(prefix, value):
 def remote(script):
     """Runs `script` on the machine over SSH, with the SSH key of the device that runs the shortcut."""
     action_uuid = new_uuid()
-    return action_uuid, action("is.workflow.actions.runsshscript", UUID=action_uuid,
-                               WFSSHAuthenticationType="SSH Key", WFSSHHost=SSH_HOST,
-                               WFSSHUser=SSH_USER, WFSSHScript=script)
+    return action_uuid, action(
+        "is.workflow.actions.runsshscript",
+        UUID=action_uuid,
+        WFSSHAuthenticationType="SSH Key",
+        WFSSHHost=SSH_HOST,
+        WFSSHUser=SSH_USER,
+        WFSSHScript=script,
+    )
 
 
 def workflow(command):
@@ -71,28 +77,38 @@ def workflow(command):
     answer = output_of(answer_uuid, "Résultat du script")
     # Shortcuts may see a script's output as a file: it must be read as text to be compared, otherwise the "If" fails
     # with "Choisissez une valeur pour chaque paramètre" (choose a value for each parameter).
-    answer_as_text = dict(answer, Aggrandizements=[
-        {"CoercionItemClass": "WFStringContentItem", "Type": "WFCoercionVariableAggrandizement"}])
+    answer_as_text = dict(
+        answer,
+        Aggrandizements=[{"CoercionItemClass": "WFStringContentItem", "Type": "WFCoercionVariableAggrandizement"}],
+    )
     actions = [
         reset,
-        action("is.workflow.actions.ask", UUID=first_ask, WFAskActionPrompt="Que veux-tu savoir ?",
-               WFInputType="Text"),
-        action("is.workflow.actions.setvariable", WFVariableName="Question",
-               WFInput=attachment(output_of(first_ask, "Entrée fournie"))),
-        action("is.workflow.actions.repeat.count", GroupingIdentifier=loop, WFControlFlowMode=0,
-               WFRepeatCount=50),
+        action("is.workflow.actions.ask", UUID=first_ask, WFAskActionPrompt="Que veux-tu savoir ?", WFInputType="Text"),
+        action(
+            "is.workflow.actions.setvariable",
+            WFVariableName="Question",
+            WFInput=attachment(output_of(first_ask, "Entrée fournie")),
+        ),
+        action("is.workflow.actions.repeat.count", GroupingIdentifier=loop, WFControlFlowMode=0, WFRepeatCount=50),
         chat,
         # WFCondition 4 = "is"; the script returns exactly __fin__, without a newline.
-        action("is.workflow.actions.conditional", GroupingIdentifier=stop, WFControlFlowMode=0,
-               WFCondition=4, WFConditionalActionString="__fin__",
-               WFInput={"Type": "Variable", "Variable": attachment(answer_as_text)}),
+        action(
+            "is.workflow.actions.conditional",
+            GroupingIdentifier=stop,
+            WFControlFlowMode=0,
+            WFCondition=4,
+            WFConditionalActionString="__fin__",
+            WFInput={"Type": "Variable", "Variable": attachment(answer_as_text)},
+        ),
         action("is.workflow.actions.showresult", Text="À bientôt !"),
         action("is.workflow.actions.exit"),
         action("is.workflow.actions.conditional", GroupingIdentifier=stop, WFControlFlowMode=2, UUID=new_uuid()),
-        action("is.workflow.actions.ask", UUID=next_ask, WFAskActionPrompt=text_with("", answer),
-               WFInputType="Text"),
-        action("is.workflow.actions.setvariable", WFVariableName="Question",
-               WFInput=attachment(output_of(next_ask, "Entrée fournie"))),
+        action("is.workflow.actions.ask", UUID=next_ask, WFAskActionPrompt=text_with("", answer), WFInputType="Text"),
+        action(
+            "is.workflow.actions.setvariable",
+            WFVariableName="Question",
+            WFInput=attachment(output_of(next_ask, "Entrée fournie")),
+        ),
         action("is.workflow.actions.repeat.count", GroupingIdentifier=loop, WFControlFlowMode=2, UUID=new_uuid()),
     ]
     return {
@@ -115,8 +131,9 @@ def main():
             with unsigned.open("wb") as f:
                 plistlib.dump(workflow(script), f, fmt=plistlib.FMT_BINARY)
             signed = HERE / f"{name}.shortcut"
-            subprocess.run(["shortcuts", "sign", "--mode", "anyone", "--input", str(unsigned),
-                            "--output", str(signed)], check=True)
+            subprocess.run(
+                ["shortcuts", "sign", "--mode", "anyone", "--input", str(unsigned), "--output", str(signed)], check=True
+            )
             print(signed)
 
 

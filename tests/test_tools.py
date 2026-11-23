@@ -70,8 +70,11 @@ def main():
         with open(old_p, "w", encoding="utf-8") as f:
             json.dump({"racine": "/srv/old", "lecture_seule": True}, f)
         prof = cfg.load_profile([new_p, old_p])
-        check(cfg.setting("root", "racine", prof) == "/srv/old" and cfg.setting("read_only", "lecture_seule", prof) is True,
-              "former profil.json French keys are read")
+        check(
+            cfg.setting("root", "racine", prof) == "/srv/old"
+            and cfg.setting("read_only", "lecture_seule", prof) is True,
+            "former profil.json French keys are read",
+        )
         with open(new_p, "w", encoding="utf-8") as f:
             json.dump({"root": "/srv/new", "read_only": False}, f)
         prof = cfg.load_profile([new_p, old_p])
@@ -79,8 +82,10 @@ def main():
         home_names = {t["name"] for t in cfg.build_schema(at_home=True, read_only=False)}
         ro_names = {t["name"] for t in cfg.build_schema(at_home=False, read_only=True, folders="iCloud")}
         check(cfg.WRITING.issubset(home_names), "Mac schema includes write tools")
-        check(ro_names.isdisjoint(cfg.WRITING) and "list_dir" in ro_names and "google" in ro_names,
-              "read-only server schema strips write tools")
+        check(
+            ro_names.isdisjoint(cfg.WRITING) and "list_dir" in ro_names and "google" in ro_names,
+            "read-only server schema strips write tools",
+        )
 
     print("Paths & scope")
     with tempfile.TemporaryDirectory() as base:
@@ -93,13 +98,22 @@ def main():
             f.write("bonjour\n")
         configure_sandbox(root, at_home=True, read_only=False)
         resolved = tools.resolve("Téléchargements/facture d'avril")
-        check(resolved.endswith("/Downloads/Facture d\u2019avril.txt"), "tolerant path resolves French alias, case, apostrophe, and extension", resolved)
-        expect_refusal(lambda: tools.resolve("../outside", must_exist=False), "path traversal outside root refused", "hors")
+        check(
+            resolved.endswith("/Downloads/Facture d\u2019avril.txt"),
+            "tolerant path resolves French alias, case, apostrophe, and extension",
+            resolved,
+        )
+        expect_refusal(
+            lambda: tools.resolve("../outside", must_exist=False), "path traversal outside root refused", "hors"
+        )
         expect_refusal(lambda: tools.resolve(".ssh", must_exist=False), "hidden top-level folder refused", "caché")
         expect_refusal(lambda: tools.resolve("Library/Mail"), "Library outside CloudStorage refused", "Library")
         check(tools.resolve("Library/CloudStorage/GoogleDrive").endswith("GoogleDrive"), "Library/CloudStorage allowed")
-        check(tools.protected_root(cfg.ROOT) and tools.protected_root(os.path.join(cfg.ROOT, "Library/CloudStorage/GoogleDrive")),
-              "root and CloudStorage mount are protected")
+        check(
+            tools.protected_root(cfg.ROOT)
+            and tools.protected_root(os.path.join(cfg.ROOT, "Library/CloudStorage/GoogleDrive")),
+            "root and CloudStorage mount are protected",
+        )
 
     print("Listing, searching & reading")
     with tempfile.TemporaryDirectory() as base:
@@ -112,7 +126,9 @@ def main():
             f.write(b"\x00\x01\x02binary")
         docx = os.path.join(root, "iCloud", "doc.docx")
         with zipfile.ZipFile(docx, "w") as z:
-            z.writestr("word/document.xml", "<w:document><w:body><w:p><w:t>Devis validé</w:t></w:p></w:body></w:document>")
+            z.writestr(
+                "word/document.xml", "<w:document><w:body><w:p><w:t>Devis validé</w:t></w:p></w:body></w:document>"
+            )
         odt = os.path.join(root, "iCloud", "doc.odt")
         with zipfile.ZipFile(odt, "w") as z:
             z.writestr("content.xml", "<office:text><text:p>Contrat signé</text:p></office:text>")
@@ -122,9 +138,17 @@ def main():
         configure_sandbox(root, at_home=False, read_only=False)
 
         listed = tools.list_dir("iCloud")
-        check("Factures/" in listed and "note.txt" in listed and ".hidden" not in listed, "list_dir formats folders and skips hidden items", listed)
+        check(
+            "Factures/" in listed and "note.txt" in listed and ".hidden" not in listed,
+            "list_dir formats folders and skips hidden items",
+            listed,
+        )
         found, complete = tools.search_by_name("factures", cfg.ROOT)
-        check(complete and len(found) == 1 and found[0].endswith("Factures"), "search_by_name finds nested folder and skips hidden dirs", found)
+        check(
+            complete and len(found) == 1 and found[0].endswith("Factures"),
+            "search_by_name finds nested folder and skips hidden dirs",
+            found,
+        )
 
         old_max = cfg.MAX_READ
         cfg.MAX_READ = 10
@@ -140,7 +164,11 @@ def main():
         check("Devis validé" in tools.office_text(docx, ".docx"), "office_text reads .docx XML")
         check("Contrat signé" in tools.office_text(odt, ".odt"), "office_text reads .odt XML")
         html_out = tools.office_text(html_file, ".html")
-        check("Bonjour" in html_out and "color:red" not in html_out and "bad()" not in html_out, "office_text strips style/script from HTML", html_out)
+        check(
+            "Bonjour" in html_out and "color:red" not in html_out and "bad()" not in html_out,
+            "office_text strips style/script from HTML",
+            html_out,
+        )
         expect_refusal(lambda: tools.office_text(docx, ".doc"), "office_text refuses legacy .doc", "illisible")
 
     print("Writes, pending confirmation & read-only guard")
@@ -151,7 +179,11 @@ def main():
 
         out = tools.write_file("Docs/a.txt", "ligne 1", "create")
         check(out.startswith("Fait : création"), "write_file create succeeds immediately", out)
-        expect_refusal(lambda: tools.write_file("Docs/a.txt", "x", "create"), "write_file create refuses existing file", "existe déjà")
+        expect_refusal(
+            lambda: tools.write_file("Docs/a.txt", "x", "create"),
+            "write_file create refuses existing file",
+            "existe déjà",
+        )
         tools.write_file("Docs/a.txt", "ligne 2", "append")
         with open(os.path.join(root, "Docs", "a.txt"), encoding="utf-8") as f:
             check(f.read() == "ligne 1\nligne 2\n", "write_file append appends cleanly")
@@ -168,12 +200,20 @@ def main():
         check(os.path.isfile(os.path.join(root, "Docs", "Sub", "a.txt")), "copy into directory works")
 
         out = tools.move("Docs/a.txt", "Docs/b.txt")
-        check(out.startswith("EN ATTENTE") and os.path.exists(os.path.join(root, "Docs", "a.txt")), "move waits for confirmation")
+        check(
+            out.startswith("EN ATTENTE") and os.path.exists(os.path.join(root, "Docs", "a.txt")),
+            "move waits for confirmation",
+        )
         done = tools.confirm()
-        check("est maintenant" in done and os.path.exists(os.path.join(root, "Docs", "b.txt")), "confirm runs queued move")
+        check(
+            "est maintenant" in done and os.path.exists(os.path.join(root, "Docs", "b.txt")), "confirm runs queued move"
+        )
 
         out = tools.delete(["Docs/b.txt"])
-        check(out.startswith("EN ATTENTE") and os.path.exists(os.path.join(root, "Docs", "b.txt")), "delete waits for confirmation")
+        check(
+            out.startswith("EN ATTENTE") and os.path.exists(os.path.join(root, "Docs", "b.txt")),
+            "delete waits for confirmation",
+        )
         # Expire pending entry
         with open(cfg.PENDING_FILE, encoding="utf-8") as f:
             pending = json.load(f)
@@ -182,14 +222,25 @@ def main():
             json.dump(pending, f)
         check(tools.load_pending() is None and not os.path.exists(cfg.PENDING_FILE), "expired pending queue is dropped")
 
-        expect_refusal(lambda: tools.delete(["Docs"]), "top-level mounted folder cannot be deleted in non-home mode", "ne peut pas être supprimé")
+        expect_refusal(
+            lambda: tools.delete(["Docs"]),
+            "top-level mounted folder cannot be deleted in non-home mode",
+            "ne peut pas être supprimé",
+        )
 
         # Read-only CLI guard
         cfg.READ_ONLY = True
         cli_out = run_cli("write_file", json.dumps({"path": "Docs/c.txt", "content": "x", "mode": "create"}))
-        check(cli_out.startswith("REFUS : ") and "lecture seule" in cli_out, "CLI refuses write tools when READ_ONLY", cli_out)
+        check(
+            cli_out.startswith("REFUS : ") and "lecture seule" in cli_out,
+            "CLI refuses write tools when READ_ONLY",
+            cli_out,
+        )
         cli_schema = json.loads(run_cli("--schema"))
-        check(isinstance(cli_schema, list) and cli_schema[0]["type"] == "function", "CLI --schema outputs OpenAI function tools")
+        check(
+            isinstance(cli_schema, list) and cli_schema[0]["type"] == "function",
+            "CLI --schema outputs OpenAI function tools",
+        )
 
     print("All good.")
 

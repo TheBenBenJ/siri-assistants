@@ -1,7 +1,8 @@
 # Signed shortcuts written by build-shortcuts.py: they hold the host's name and the account.
 *.shortcut
-# Python bytecode
+# Python bytecode & linter cache
 __pycache__/
 *.py[cod]
+.ruff_cache/
 # macOS
 .DS_Store
