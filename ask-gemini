@@ -186,7 +186,7 @@ fi
 zmodload zsh/datetime
 journal() {  # journal <model> <seconds> <input tokens> <output tokens> <mode>
   /bin/mkdir -p "${JOURNAL:h}"
-  print -r -- "$(/bin/date '+%F %T')  ${(r:36:)1}$(printf '%5.1f' "$2") s  ${(l:5:)3} → ${(r:5:)4}tokens  ${(r:8:)5}${${question//$'\n'/ }[1,80]}" >> "$JOURNAL"
+  print -r -- "$(/bin/date '+%F %T')  ${(r:36:)1}$(printf '%5.1f' "$2") s  ${(l:5:)3} → ${(r:5:)4}tokens  ${(r:12:)5}${${question//$'\n'/ }[1,80]}" >> "$JOURNAL"
 }
 
 # A Google action waits for a "oui" since the previous turn: decide here, without the model. Only these exact words
