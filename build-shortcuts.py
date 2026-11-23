@@ -26,7 +26,7 @@ if len(sys.argv) not in (2, 3):
 SSH_HOST = sys.argv[1]
 SSH_USER = sys.argv[2] if len(sys.argv) == 3 else getpass.getuser()
 # The shortcut's name is the Siri phrase. "Gemma" is only a name: ask-local asks Qwen, a word Siri mishears.
-SHORTCUTS = {"Appelle Claude": "ask-haiku", "Appelle Gemma": "ask-local"}
+SHORTCUTS = {"Appelle Gemini": "ask-gemini", "Appelle Gemma": "ask-local"}
 OBJECT = "￼"  # U+FFFC, marks where a variable sits in a text
 
 

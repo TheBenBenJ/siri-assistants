@@ -1,8 +1,8 @@
 #!/bin/zsh
 # ask-ssh: the only command the shortcuts' SSH keys may run on this machine (the Mac or a server), forced by
 # restrict,command="..." in ~/.ssh/authorized_keys. It only accepts:
-#   ask-haiku --reset | ask-local --reset
-#   ask-haiku --chat [question] | ask-local --chat [question]
+#   ask-gemini --reset | ask-haiku --reset | ask-local --reset
+#   ask-gemini --chat [question] | ask-haiku --chat [question] | ask-local --chat [question]
 # The question follows the command or arrives on stdin; it is handed to the script on stdin as data, never run.
 # Every question is logged to ~/.cache/ask/ssh.log, without its text: a failing shortcut would otherwise leave no trace here.
 set -euo pipefail
@@ -21,12 +21,15 @@ refuse() {
 
 script="${words[1]:t}"
 target="$HOME_DIR/.local/bin/$script"
+if [[ $script == ask-haiku && ! -x $target && -x "$HOME_DIR/.local/bin/ask-gemini" ]]; then
+  target="$HOME_DIR/.local/bin/ask-gemini"
+fi
 case "$script ${words[2]}" in
-  (ask-haiku\ --reset|ask-local\ --reset)
+  (ask-gemini\ --reset|ask-haiku\ --reset|ask-local\ --reset)
     (( ${#words} == 2 )) || refuse
     exec "$target" --reset
     ;;
-  (ask-haiku\ --chat|ask-local\ --chat)
+  (ask-gemini\ --chat|ask-haiku\ --chat|ask-local\ --chat)
     question=""
     if (( ${#words} > 2 )); then
       question="${(j: :)words[3,-1]}"

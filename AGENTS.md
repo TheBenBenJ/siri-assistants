@@ -8,8 +8,8 @@ Guidance for autonomous agents and contributors working in `siri-assistants`.
 
 ### Layout
 
-- `ask-ssh` — Forced SSH command (`restrict,command=`) accepting only `ask-haiku` or `ask-local` with `--reset` or `--chat`.
-- `ask-haiku`, `ask-local` — Zsh conversation scripts; both invoke `/usr/bin/python3 -I "${0:A:h}/tools.py"`.
+- `ask-ssh` — Forced SSH command (`restrict,command=`) accepting only `ask-gemini` (plus legacy `ask-haiku` alias) or `ask-local` with `--reset` or `--chat`.
+- `ask-gemini`, `ask-local` — Zsh conversation scripts (`ask-haiku` is kept as a symlink to `ask-gemini` for existing shortcuts); both invoke `/usr/bin/python3 -I "${0:A:h}/tools.py"`.
 - `tools.py` + `tools_lib/` — Local model tool runner and shared confirmation gateway (`--schema`, `--pending`, `--confirm`, `--cancel`).
   - `tools_lib/config.py` — Profile loading (`profile.json` / legacy `profil.json`), constants, OpenAI tool schema builder, `Refusal`, action logger.
   - `tools_lib/paths.py` — Tolerant French path matching and scope/sandbox enforcement.
@@ -41,7 +41,7 @@ Run the offline CI checks from the repository root:
 
 ```bash
 python3 -m py_compile tools.py tools_lib/*.py google-bridge.py spoken_dates.py build-shortcuts.py recap tests/test_*.py
-zsh -n ask-haiku ask-local ask-ssh google add-task
+zsh -n ask-gemini ask-local ask-ssh google add-task
 python3 -I tests/test_google_bridge.py
 python3 -I tests/test_tools.py
 python3 -I tests/test_recap.py   # macOS only (uses brctl simulation)
