@@ -55,7 +55,11 @@ pas de Markdown, de listes à puces, de tableaux ni d'emojis. \
 Tu n'as ici aucun outil : ni les fichiers, ni le compte Google, ni la liste de tâches de l'utilisateur ne te sont accessibles ; ne prétends jamais avoir fait une action."
 
 readonly CLAUDE_BIN="${$(profile claude claude):-/opt/homebrew/bin/claude}"
+readonly AGY_BIN="${$(profile agy agy):-${${:-/usr/local/bin/agy}:A}}"
+readonly AGY_MODEL="${ASK_AGY_MODEL:-${$(profile agy_model agy_model):-gemini-3.8-flash-low}}"
+readonly PROVIDER="${ASK_PROVIDER:-${$(profile provider provider):-$(/bin/cat /etc/home-server/ai-provider 2>/dev/null | /usr/bin/tr -d '[:space:]' || print -r -- antigravity)}}"
 readonly SESSION_FILE="$HOME_DIR/.cache/ask-haiku/claude-session"
+readonly AGY_SESSION_FILE="$HOME_DIR/.cache/ask-haiku/agy-session"
 readonly NOTE_FILE="$HOME_DIR/.cache/ask-haiku/note"  # what a "oui" ran without the model, told to it on the next turn
 readonly AGENT_ERRORS="$HOME_DIR/.cache/ask-haiku/agent-error.log"
 # Read-only profile: read tools only. Otherwise (the Mac) writes are allowed, safely: mv -n and cp -n never overwrite,
@@ -139,7 +143,7 @@ case "${1:-}" in
     exit 0
     ;;
   --reset)
-    /bin/rm -f "$HISTORY_FILE" "$SESSION_FILE" "$NOTE_FILE"
+    /bin/rm -f "$HISTORY_FILE" "$SESSION_FILE" "$AGY_SESSION_FILE" "$NOTE_FILE"
     "${TOOLS[@]}" --cancel
     exit 0
     ;;
@@ -176,7 +180,7 @@ if [[ $mode == chat && "$words" == (merci|merci beaucoup|non merci|stop|c est to
   exit 0
 fi
 
-if [[ ! -r "$KEY_FILE" ]]; then
+if [[ $PROVIDER == claude && ! -r "$KEY_FILE" ]]; then
   print -u2 "ask-haiku : clé API absente ou illisible ($KEY_FILE). Pour l'enregistrer : ask-haiku --set-key"
   exit 1
 fi
@@ -210,12 +214,64 @@ if [[ -n $pending ]]; then
   fi
 fi
 
-# --- 1. Claude Code, with the file tools ---------------------------------------------------------
+# --- 1. Antigravity CLI (default when PROVIDER != claude), with tools ----------------------------
 agent_fail() {
   /bin/mkdir -p "${AGENT_ERRORS:h}"
   print -r -- "$(/bin/date '+%F %T')  ${SSH_CONNECTION:+ssh }$1" >> "$AGENT_ERRORS"
 }
-if [[ -x $CLAUDE_BIN ]]; then
+agy_exec=""
+if [[ -x $AGY_BIN ]]; then
+  agy_exec="$AGY_BIN"
+elif [[ -x "$HOME_DIR/.local/bin/agy" ]]; then
+  agy_exec="$HOME_DIR/.local/bin/agy"
+fi
+if [[ $PROVIDER != claude && -n $agy_exec ]]; then
+  start=$EPOCHREALTIME
+  said="$question"
+  if [[ $mode == chat && -s $NOTE_FILE ]]; then
+    said="[Le système a exécuté ceci après le oui de l'utilisateur : $(<"$NOTE_FILE")] $question"
+  fi
+  /bin/rm -f "$NOTE_FILE"
+  /bin/mkdir -p "${AGENT_ERRORS:h}"
+  agy_args=(--model "$AGY_MODEL" --mode auto --dangerously-skip-permissions --disable-slash-commands --output-format json --print-timeout 60s)
+  if [[ $mode == chat && -s $AGY_SESSION_FILE ]]; then
+    agy_args+=(--conversation "$(<"$AGY_SESSION_FILE")" -p "$said")
+  else
+    agy_sys="${AGENT_PROMPT/Tu es Claude Haiku 5.5, un modèle d\'IA créé par Anthropic/Tu es Antigravity, l\'assistant vocal de Benjamin}"
+    agy_args+=(-p "${agy_sys} Nous sommes le $(LC_ALL=fr_FR.UTF-8 /bin/date '+%A %d %B %Y, %H:%M')."$'\n\n'"Question de l'utilisateur : $said")
+  fi
+  if agent_json="$(cd "$FILES_ROOT" && /usr/bin/env -i HOME="$HOME_DIR" LC_ALL="$LC_ALL" \
+       PATH=/usr/bin:/bin:/usr/sbin:/sbin:/usr/local/bin:/opt/homebrew/bin:"$HOME_DIR/.local/bin" "$agy_exec" "${agy_args[@]}" </dev/null 2>"$AGENT_ERRORS.last")" \
+     && /usr/bin/jq -e '.status == "SUCCESS" and ((.response // "") | gsub("^[[:space:]]+|[[:space:]]+$"; "") | length > 0)' <<<"$agent_json" >/dev/null 2>&1; then
+    elapsed=$(( EPOCHREALTIME - start ))
+    answer="$(/usr/bin/jq -r '(.response // "") | gsub("^[[:space:]]+|[[:space:]]+$"; "")' <<<"$agent_json")"
+    pending="$("${TOOLS[@]}" --pending)"
+    if [[ -n $pending ]]; then
+      if [[ $mode == chat ]]; then
+        answer="$pending Tu confirmes ?"
+      else
+        "${TOOLS[@]}" --cancel
+        answer="$pending Il faut une conversation pour confirmer : je n'ai rien fait."
+      fi
+    fi
+    print -r -- "$answer"
+    if [[ $mode == chat ]]; then
+      /bin/mkdir -p "${AGY_SESSION_FILE:h}"
+      /usr/bin/jq -r '.conversation_id // empty' <<<"$agent_json" > "$AGY_SESSION_FILE"
+    fi
+    journal "$AGY_MODEL" "$elapsed" \
+      "$(/usr/bin/jq -r '.usage.input_tokens // 0' <<<"$agent_json")" \
+      "$(/usr/bin/jq -r '.usage.output_tokens // 0' <<<"$agent_json")" "$mode+agy"
+    exit 0
+  fi
+  "${TOOLS[@]}" --cancel
+  agent_fail "agy failed: $(/usr/bin/jq -r '.error // .status // empty' <<<"${agent_json:-null}" 2>/dev/null | head -c 300) $(head -c 300 "$AGENT_ERRORS.last" 2>/dev/null)"
+elif [[ $PROVIDER != claude ]]; then
+  agent_fail "agy not found ($AGY_BIN)"
+fi
+
+# --- 2. Claude Code, with the file tools (when PROVIDER=claude, or fallback if Antigravity failed) ---
+if [[ -r "$KEY_FILE" && -x $CLAUDE_BIN ]]; then
   agent_args=(-p --bare --settings "$AGENT_SETTINGS" --model "$MODEL" --effort low --output-format json
               --tools "${AGENT_TOOLS[@]}" --strict-mcp-config
               --system-prompt "$AGENT_PROMPT Nous sommes le $(LC_ALL=fr_FR.UTF-8 /bin/date '+%A %d %B %Y, %H:%M').")
@@ -264,7 +320,11 @@ else
   agent_fail "$CLAUDE_BIN not found"
 fi
 
-# --- 2. Fallback: the Messages API directly, without tools ---------------------------------------
+# --- 3. Fallback: the Messages API directly, without tools ---------------------------------------
+if [[ ! -r "$KEY_FILE" ]]; then
+  print -u2 "ask-haiku : Antigravity indisponible et clé API Anthropic absente ($KEY_FILE)."
+  exit 1
+fi
 api_key="$(<"$KEY_FILE")"
 
 conversation='[]'
