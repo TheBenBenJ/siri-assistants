@@ -25,15 +25,19 @@ Guidance for autonomous agents and contributors working in `siri-assistants`.
 1. **Standard library only & `python3 -I`**: Every Python script runs in isolated mode (`-I`) with zero third-party dependencies.
    - Entrypoints (`tools.py`, `google-bridge.py`, `recap`) must explicitly prepend their real script directory to `sys.path` and avoid writing `__pycache__` when running read-only.
    - Maintain an acyclic module DAG inside `tools_lib/` (`config` ← `paths` ← `pending` ← `files`).
-2. **Security invariants**:
+2. **Clean structure & typed models**:
+   - Keep functions focused and concise (~30–100 lines); avoid ad-hoc deeply nested JSON dict construction when a stdlib `@dataclass` with `.to_dict()` makes the contract explicit.
+   - Keep `README.md`, `CLAUDE.md`, and `AGENTS.md` updated whenever scripts, providers, interfaces, or tests change.
+3. **Security invariants**:
    - Never weaken `google-bridge.py` HTTP checks (`Host`, no `Origin`, `X-Assistant: 1`).
    - Never execute destructive or external write actions without voice confirmation (`/confirmer` / `--confirm`).
    - Keep untrusted external data prefixed with the French data-not-instruction warning (`UNTRUSTED`).
    - Never expose sensitive Keep notes content or secrets in logs/stdout.
-3. **Language**:
-   - Technical identifiers, filenames, comments, docstrings, and commit messages in **English**.
+4. **Language**:
+   - Technical identifiers, filenames, comments, docstrings, tests, docs, and commit messages in **English**.
    - Spoken prompts, tool descriptions/parameters, bridge action verbs/args, and user-facing answers stay in **French** (shared API contract).
-4. **Never push directly to `main`** without explicit user validation (a green push to `main` auto-promotes `production` and deploys to `pc-benjamin`).
+5. **Mandatory offline tests**: Every new behavior or bug fix must add/update offline `python3 -I` tests in `tests/test_*.py`.
+6. **Never push directly to `main`** without explicit user validation (a green push to `main` auto-promotes `production` and deploys to `pc-benjamin`).
 
 ## Required Verification Before Commit
 
@@ -45,5 +49,6 @@ python3 -m py_compile tools.py tools_lib/*.py google-bridge.py spoken_dates.py b
 zsh -n ask-gemini ask-local ask-ssh
 python3 -I tests/test_google_bridge.py
 python3 -I tests/test_tools.py
+python3 -I tests/test_spoken_dates.py
 python3 -I tests/test_recap.py   # macOS only (uses brctl simulation)
 ```

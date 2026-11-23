@@ -1,8 +1,8 @@
 # siri-assistants
 
-Talk to Claude Haiku or to a local model by voice through Siri, on the iPhone or the Mac, in a real back-and-forth conversation. The assistants can read your files, your tasks, your daily recap and your Google account (Gmail, Calendar, Drive, Contacts, Tasks, Keep notes). Sending or changing anything in Google, and moving, deleting or overwriting files, waits for a spoken "oui" (see the limits under [Security model](#security-model)).
+Talk to Gemini (via Antigravity `agy` by default, switchable to Claude via `/etc/home-server/ai-provider`) or to a local model by voice through Siri, on the iPhone or the Mac, in a real back-and-forth conversation. The assistants can read your files, your tasks, your daily recap and your Google account (Gmail, Calendar, Drive, Contacts, Tasks, Keep notes). Sending or changing anything in Google, and moving, deleting or overwriting files, waits for a spoken "oui" (see the limits under [Security model](#security-model)).
 
-The spoken side is French: shortcut names, prompts, answers and confirmation words. Code, comments, log formats and this README are English.
+The spoken side is French: shortcut names, prompts, answers and confirmation words. Code, comments, log formats, tests and this README are English. Engineering & agent rules: [`CLAUDE.md`](CLAUDE.md) and [`AGENTS.md`](AGENTS.md).
 
 ## Why
 
@@ -13,26 +13,26 @@ Siri cannot hold a conversation with a model of your choice, and a shortcut that
 ```
  iPhone / Mac                          Host (Linux server, or the Mac)
  ─────────────                         ──────────────────────────────────────────────────────────
- "Appelle Claude"
+ "Appelle Gemini" / "Appelle Gemma"
  Shortcut: dictate ──SSH (Tailscale)──▶ sshd ──forced command──▶ ask-ssh
-           question                                               │ only: ask-haiku | ask-local
+           question                                               │ only: ask-gemini (or ask-haiku symlink) | ask-local
                                                                   │       --reset | --chat
                                                                   ▼
-                                     ask-haiku ──▶ Claude Code, headless (claude -p --bare)
+                                     ask-gemini ─▶ Antigravity CLI (`agy`, default) or Claude Code (`claude -p --bare`)
                                          │           closed list of tools: files, add-task, google, recap
-                                         │           (fallback: Messages API, no tools)
-                                     ask-local ──▶ local model, OpenAI-compatible API (127.0.0.1:11234)
-                                                     tool-call loop run by the script, tools in tools.py
+                                         │           (provider switchable via /etc/home-server/ai-provider)
+                                     ask-local  ─▶ local model, OpenAI-compatible API (127.0.0.1:11234)
+                                                     tool-call loop run by the script, tools in tools.py + tools_lib/
                                                                   │
-                 ┌─ google (Claude) or tool google (Qwen) ──HTTP :8766──▶ google-bridge.py ──▶ Google APIs
+                 ┌─ google (cloud) or tool google (local) ─HTTP :8766─▶ google-bridge.py ──▶ Google APIs
           tools ─┼─ add-task ──HTTP :8765──▶ dashboard ──▶ Google Tasks
                  └─ recap ──▶ recap JSON file, written by the dashboard
  Siri reads the answer ◀──────── stdout ──────── (then listens again; "merci" or "stop" ends)
 ```
 
 1. The shortcut runs `<script> --reset`, asks "Que veux-tu savoir ?", then loops up to 50 times: it runs `<script> --chat <question>` over SSH and uses the answer as the prompt of the next dictation, so Siri reads it and listens again. When the script prints exactly `__fin__` ("merci", "stop", "c'est tout"... or an empty dictation), the shortcut says "À bientôt !" and stops.
-2. `ask-ssh`, the forced command of the shortcuts' SSH keys, accepts only those two scripts with `--reset` or `--chat`, and hands the question to the script on stdin. It never runs it.
-3. `ask-haiku` runs Claude Haiku through headless Claude Code with a fixed permission list. `ask-local` runs its own tool-call loop against the local model, with the tools of `tools.py`.
+2. `ask-ssh`, the forced command of the shortcuts' SSH keys, accepts only `ask-gemini` (plus legacy `ask-haiku` symlink) or `ask-local` with `--reset` or `--chat`, and hands the question to the script on stdin. It never runs it.
+3. `ask-gemini` invokes Antigravity (`agy`) by default — or Claude Code (`claude -p --bare`) when `/etc/home-server/ai-provider` is set to `claude` — with a closed tool set. `ask-local` runs its own tool-call loop against the local model using `tools.py` + `tools_lib/`.
 4. Reads and harmless writes (a new task, a new file, a copy) are immediate. Sending, deleting, moving or overwriting becomes a proposal. On the next turn, the script itself compares the user's words with a fixed list of yes and no words; only a yes runs the proposal.
 
 ### Voice-confirmed actions
@@ -47,17 +47,18 @@ Siri cannot hold a conversation with a model of your choice, and a shortcut that
 
 | File | Role |
 | --- | --- |
-| `ask-ssh` | Forced command of the shortcuts' SSH keys: allows `ask-haiku` or `ask-local` with `--reset` or `--chat`, logs each call without its text. |
-| `ask-haiku` | Claude Haiku through `claude -p --bare`, with a closed list of tools; falls back to the Messages API without tools. `--set-key` stores the API key. |
-| `ask-local` | The local model (Qwen 3.5 9B), with a tool-call loop run by the script, one nudge when it forgets the tools, the recap read verbatim. |
-| `tools.py` | The local model's tools (files, `add_task`, `recap`, `google`) and `--pending`, `--confirm`, `--cancel` for both assistants, which run it from their own folder (implementation in `tools_lib/`). |
+| `ask-ssh` | Forced command of the shortcuts' SSH keys: allows `ask-gemini` (plus legacy `ask-haiku` alias) or `ask-local` with `--reset` or `--chat`, logs each call without its text. |
+| `ask-gemini` (`ask-haiku` symlink) | Cloud voice assistant via Antigravity (`agy`, default) or Claude Code (`claude -p --bare`, controlled by `/etc/home-server/ai-provider`), with a closed list of tools. |
+| `ask-local` | The local model (Qwen), with a tool-call loop run by the script, one nudge when it forgets the tools, the recap read verbatim. |
+| `tools.py` + `tools_lib/` | Local model tools (`config.py`, `paths.py`, `pending.py`, `files.py`) and `--pending`, `--confirm`, `--cancel` for both assistants. |
 | `google-bridge.py` | Local HTTP bridge to Google on 127.0.0.1:8766. Holds the token, serves reads, keeps write proposals in memory. |
-| `google` | Command-line client of the bridge, the form Claude uses (`google mails`, `google repondre 2 "texte"`...). |
+| `google` | Command-line client of the bridge (`google mails`, `google repondre 2 "texte"`...). |
 | `add-task` | Adds a task through the dashboard, which syncs Google Tasks. |
 | `recap` | Reads the daily recap file; `--dire` prints only the text to say. |
 | `spoken_dates.py` | French spoken dates and times ("vendredi 14h", "demain") to real dates, and back to speech. |
-| `build-shortcuts.py` | Builds and signs the two shortcuts, "Appelle Claude" and "Appelle Gemma". |
-| `tests/` | Offline tests of the bridge (fake Google), the local tools (`test_tools.py`), and the recap. |
+| `build-shortcuts.py` | Builds and signs the iOS/macOS shortcuts. |
+| `tests/` | Offline `python3 -I` tests: `test_google_bridge.py`, `test_tools.py`, `test_spoken_dates.py`, and macOS-only `test_recap.py` (all Linux-compatible suites + `ruff check` & `ruff format --check` run in CI). |
+| `pyproject.toml` | Ruff linter & formatter configuration (`py314`, 120-char line length). |
 | `PRIVACY.md` | Privacy notice of the Google OAuth app. |
 
 The dashboard is a separate personal project. This repository only relies on three of its interfaces, described under [Interfaces](#interfaces); point them at your own service.
