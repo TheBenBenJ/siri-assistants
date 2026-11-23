@@ -50,14 +50,14 @@ Siri cannot hold a conversation with a model of your choice, and a shortcut that
 | `ask-ssh` | Forced command of the shortcuts' SSH keys: allows `ask-haiku` or `ask-local` with `--reset` or `--chat`, logs each call without its text. |
 | `ask-haiku` | Claude Haiku through `claude -p --bare`, with a closed list of tools; falls back to the Messages API without tools. `--set-key` stores the API key. |
 | `ask-local` | The local model (Qwen 3.5 9B), with a tool-call loop run by the script, one nudge when it forgets the tools, the recap read verbatim. |
-| `tools.py` | The local model's tools (files, `add_task`, `recap`, `google`) and `--pending`, `--confirm`, `--cancel` for both assistants, which run it from their own folder. |
+| `tools.py` | The local model's tools (files, `add_task`, `recap`, `google`) and `--pending`, `--confirm`, `--cancel` for both assistants, which run it from their own folder (implementation in `tools_lib/`). |
 | `google-bridge.py` | Local HTTP bridge to Google on 127.0.0.1:8766. Holds the token, serves reads, keeps write proposals in memory. |
 | `google` | Command-line client of the bridge, the form Claude uses (`google mails`, `google repondre 2 "texte"`...). |
 | `add-task` | Adds a task through the dashboard, which syncs Google Tasks. |
 | `recap` | Reads the daily recap file; `--dire` prints only the text to say. |
 | `spoken_dates.py` | French spoken dates and times ("vendredi 14h", "demain") to real dates, and back to speech. |
 | `build-shortcuts.py` | Builds and signs the two shortcuts, "Appelle Claude" and "Appelle Gemma". |
-| `tests/` | Offline tests of the bridge (fake Google) and of the recap. |
+| `tests/` | Offline tests of the bridge (fake Google), the local tools (`test_tools.py`), and the recap. |
 | `PRIVACY.md` | Privacy notice of the Google OAuth app. |
 
 The dashboard is a separate personal project. This repository only relies on three of its interfaces, described under [Interfaces](#interfaces); point them at your own service.
