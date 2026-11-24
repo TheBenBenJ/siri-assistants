@@ -34,7 +34,7 @@ def list_dir(path, sort="nom"):
 
 
 def search_by_name(query, real, budget=20):
-    """Without Spotlight: walks the names, hidden folders excluded, within a time budget (a mounted cloud drive lists slowly)."""
+    """Walk filenames without Spotlight (skipping hidden folders) within a time budget for slow cloud mounts."""
     wanted, found, deadline = loose(query), [], time.monotonic() + budget
     for top, dirs, files in os.walk(real):
         dirs[:] = sorted(d for d in dirs if not d.startswith("."))
@@ -240,7 +240,7 @@ def add_task(title, due=""):
 
 
 def recap():
-    """The text alone, without the details: Qwen gets lost in the days. For follow-up questions it has the agenda and the tasks through the google tool."""
+    """Return spoken text only (no details: Qwen loses track of days; follow-ups use the google tool)."""
     done = subprocess.run(
         [os.path.join(cfg.HOME, ".local/bin/recap"), "--dire"], capture_output=True, text=True, timeout=30
     )

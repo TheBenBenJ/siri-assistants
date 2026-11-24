@@ -61,7 +61,7 @@ def run_cli(*argv):
     return buf.getvalue()
 
 
-def main():
+def test_profile_and_paths():
     print("Profile & schema")
     with tempfile.TemporaryDirectory() as folder:
         new_p = os.path.join(folder, "profile.json")
@@ -115,6 +115,8 @@ def main():
             "root and CloudStorage mount are protected",
         )
 
+
+def test_listing_and_reading():
     print("Listing, searching & reading")
     with tempfile.TemporaryDirectory() as base:
         root = os.path.join(base, "srv")
@@ -171,6 +173,8 @@ def main():
         )
         expect_refusal(lambda: tools.office_text(docx, ".doc"), "office_text refuses legacy .doc", "illisible")
 
+
+def test_writes_and_guards():
     print("Writes, pending confirmation & read-only guard")
     with tempfile.TemporaryDirectory() as base:
         root = os.path.join(base, "work")
@@ -214,7 +218,6 @@ def main():
             out.startswith("EN ATTENTE") and os.path.exists(os.path.join(root, "Docs", "b.txt")),
             "delete waits for confirmation",
         )
-        # Expire pending entry
         with open(cfg.PENDING_FILE, encoding="utf-8") as f:
             pending = json.load(f)
         pending["time"] = time.time() - cfg.PENDING_TTL - 5
@@ -228,7 +231,6 @@ def main():
             "ne peut pas être supprimé",
         )
 
-        # Read-only CLI guard
         cfg.READ_ONLY = True
         cli_out = run_cli("write_file", json.dumps({"path": "Docs/c.txt", "content": "x", "mode": "create"}))
         check(
@@ -242,6 +244,11 @@ def main():
             "CLI --schema outputs OpenAI function tools",
         )
 
+
+def main():
+    test_profile_and_paths()
+    test_listing_and_reading()
+    test_writes_and_guards()
     print("All good.")
 
 

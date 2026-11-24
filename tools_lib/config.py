@@ -75,7 +75,10 @@ BASE_SCHEMA = [
             "properties": {
                 "path": {
                     "type": "string",
-                    "description": "Dossier, relatif au dossier personnel : Documents, Desktop (Bureau), Downloads (Téléchargements), Google Drive…",
+                    "description": (
+                        "Dossier, relatif au dossier personnel : Documents, Desktop (Bureau), "
+                        "Downloads (Téléchargements), Google Drive…"
+                    ),
                 },
                 "sort": {
                     "type": "string",
@@ -115,7 +118,10 @@ BASE_SCHEMA = [
     },
     {
         "name": "write_file",
-        "description": "Écrit un fichier texte. create : nouveau fichier ; append : ajoute à la fin ; overwrite : remplace un fichier existant (demande confirmation).",
+        "description": (
+            "Écrit un fichier texte. create : nouveau fichier ; append : ajoute à la fin ; "
+            "overwrite : remplace un fichier existant (demande confirmation)."
+        ),
         "parameters": {
             "type": "object",
             "properties": {
@@ -142,7 +148,10 @@ BASE_SCHEMA = [
     },
     {
         "name": "move",
-        "description": "Déplace ou renomme un fichier ou un dossier (demande confirmation). Si la destination est un dossier existant, déplace dedans.",
+        "description": (
+            "Déplace ou renomme un fichier ou un dossier (demande confirmation). "
+            "Si la destination est un dossier existant, déplace dedans."
+        ),
         "parameters": {
             "type": "object",
             "properties": {"source": {"type": "string"}, "destination": {"type": "string"}},
@@ -160,14 +169,19 @@ BASE_SCHEMA = [
     },
     {
         "name": "add_task",
-        "description": "Ajoute une tâche à la liste de l'utilisateur (Google Tasks et dashboard). Immédiat, sans confirmation.",
+        "description": (
+            "Ajoute une tâche à la liste de l'utilisateur (Google Tasks et dashboard). Immédiat, sans confirmation."
+        ),
         "parameters": {
             "type": "object",
             "properties": {
                 "title": {"type": "string", "description": "La tâche, courte, dans les mots de l'utilisateur."},
                 "due": {
                     "type": "string",
-                    "description": "Échéance telle que l'utilisateur la dit, sans la calculer (vendredi, demain, 3 novembre), seulement s'il en donne une.",
+                    "description": (
+                        "Échéance telle que l'utilisateur la dit, sans la calculer "
+                        "(vendredi, demain, 3 novembre), seulement s'il en donne une."
+                    ),
                 },
             },
             "required": ["title"],
@@ -175,7 +189,13 @@ BASE_SCHEMA = [
     },
     {
         "name": "google",
-        "description": "Son compte Google. Lire, immédiat : mails (requete : recherche Gmail, boîte de réception par défaut), mail (numero), contact (requete), agenda (jours), drive (requete), document (numero), taches, notes (requete : ses notes Keep). Agir, demande confirmation : repondre (numero, texte), envoyer (a, objet, texte), brouillon (a, objet, texte), archiver (numero), corbeille (numero), rdv (titre, quand, duree, lieu), annuler-rdv (numero). numero : celui de la dernière liste.",
+        "description": (
+            "Son compte Google. Lire, immédiat : mails (requete : recherche Gmail, boîte de réception par défaut), "
+            "mail (numero), contact (requete), agenda (jours), drive (requete), document (numero), taches, "
+            "notes (requete : ses notes Keep). Agir, demande confirmation : repondre (numero, texte), "
+            "envoyer (a, objet, texte), brouillon (a, objet, texte), archiver (numero), corbeille (numero), "
+            "rdv (titre, quand, duree, lieu), annuler-rdv (numero). numero : celui de la dernière liste."
+        ),
         "parameters": {
             "type": "object",
             "properties": {
@@ -222,7 +242,11 @@ BASE_SCHEMA = [
     },
     {
         "name": "recap",
-        "description": "Son récap du jour : météo, agenda, à faire, mails à traiter. Pour « mon récap », « résume ma journée », « qu'est-ce que j'ai aujourd'hui ». Lu tel quel à l'utilisateur.",
+        "description": (
+            "Son récap du jour : météo, agenda, à faire, mails à traiter. "
+            "Pour « mon récap », « résume ma journée », « qu'est-ce que j'ai aujourd'hui ». "
+            "Lu tel quel à l'utilisateur."
+        ),
         "parameters": {"type": "object", "properties": {}},
     },
 ]

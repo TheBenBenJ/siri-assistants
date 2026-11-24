@@ -38,7 +38,7 @@ def words_of(text):
 
 
 def spoken_date(text, today):
-    """Date of a spoken due date (vendredi, demain, 3 novembre, 3/11, 2026-11-06). ValueError if it is not understood."""
+    """Parse a spoken due date (vendredi, demain, 3 novembre, 3/11, 2026-11-06); raise ValueError if unknown."""
     text = text.strip()
     if re.fullmatch(r"\d{4}-\d{2}-\d{2}", text):
         return datetime.date.fromisoformat(text)
@@ -59,7 +59,7 @@ def spoken_date(text, today):
 
 
 def spoken_moment(text, today):
-    """(date, time or None) of a spoken moment: "vendredi 14h", "demain à 9 h 30", "3 novembre", "18h". ValueError if it is not understood."""
+    """Parse a spoken moment ("vendredi 14h", "demain à 9 h 30", "3 novembre", "18h") into (date, time | None)."""
     text = plain(text).replace("t", " ", 1) if re.match(r"\d{4}-\d{2}-\d{2}t", plain(text)) else plain(text)
     hour = None
     found = CLOCK_TIME.search(text)

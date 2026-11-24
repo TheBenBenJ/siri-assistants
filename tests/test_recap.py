@@ -41,7 +41,7 @@ def check(ok, text, detail=""):
     print("  ok  " + text)
 
 
-def main():
+def test_daily_recap():
     print("Daily recap")
     said = recap.for_model(FRESH, NOW)
     check(said.startswith(recap.UNTRUSTED), "for the model, the recap is presented as data, not an instruction")
@@ -75,6 +75,8 @@ def main():
         recap.for_model(old, NOW),
     )
 
+
+def test_file_and_profile():
     print("File")
     with tempfile.TemporaryDirectory() as folder:
         path = os.path.join(folder, "Recap du jour.json")
@@ -82,7 +84,6 @@ def main():
             json.dump(FRESH, f)
         check(recap.read_recap(path)["date"] == "2026-10-31", "the file is read")
 
-        # A file left in the cloud: open fails (Errno 11 under launchd) until brctl has downloaded it.
         real_open, real_run, real_sleep = open, recap.subprocess.run, recap.time.sleep
         attempts, asked = [], []
 
@@ -147,6 +148,8 @@ def main():
             except SystemExit as e:
                 check(expected in str(e.code), text, e.code)
 
+
+def test_profile():
     print("Profile")
     with tempfile.TemporaryDirectory() as folder:
         new, former = os.path.join(folder, "profile.json"), os.path.join(folder, "profil.json")
@@ -158,6 +161,12 @@ def main():
         with open(new, "w") as f:
             json.dump({"root": "/srv", "recap": "/srv/new.json"}, f)
         check(recap.profile_recap() == "/srv/new.json", "profile.json is preferred")
+
+
+def main():
+    test_daily_recap()
+    test_file_and_profile()
+    test_profile()
     print("All good.")
 
 

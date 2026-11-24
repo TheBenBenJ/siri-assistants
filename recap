@@ -43,7 +43,7 @@ OLD = datetime.timedelta(hours=3)  # the producer rewrites the file at least onc
 
 
 def read_recap(path):
-    """With iCloud's "Optimise Mac Storage", the file may only be in the cloud: ask for it to be downloaded, then retry."""
+    """Download from iCloud if evicted ("Optimise Mac Storage"), then retry reading."""
     for attempt in range(4):
         try:
             with open(path, encoding="utf-8") as f:
@@ -73,12 +73,13 @@ def to_say(recap, now):
 
 
 def for_model(recap, now):
-    """The text to say, then the details (without the producer's own reading instructions). A stale recap gets no details."""
+    """Return spoken text plus details (excluding producer instructions); omit details when stale."""
     said = to_say(recap, now)
     if not is_current(recap, now):
         return f"À dire : {said}"
     details = {k: v for k, v in recap.items() if k not in ("lecture", "genere_a", "a_dire")}
-    return f"{UNTRUSTED}À dire : {said}\nDétails, pour les questions de suite : {json.dumps(details, ensure_ascii=False, separators=(',', ':'))}"
+    payload = json.dumps(details, ensure_ascii=False, separators=(",", ":"))
+    return f"{UNTRUSTED}À dire : {said}\nDétails, pour les questions de suite : {payload}"
 
 
 def main():

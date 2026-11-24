@@ -63,7 +63,8 @@ def main():
         print(f"Fait : « {title} » est sur le dashboard{due_text}. Google Tasks n'est pas encore relié.")
     else:
         print(
-            f"Fait : « {title} » est sur le dashboard{due_text}. Google Tasks ne répond pas : elle y sera recopiée dès que possible."
+            f"Fait : « {title} » est sur le dashboard{due_text}. "
+            "Google Tasks ne répond pas : elle y sera recopiée dès que possible."
         )
 
 
