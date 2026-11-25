@@ -10,7 +10,7 @@
 # "merci", "stop", "c'est tout"... return __fin__, and the shortcut stops.
 # Every answer is logged to ~/.cache/ask/journal.log (model, duration, tokens, mode, start of the question).
 #
-# Provider comes from ASK_PROVIDER, profile.json ("provider"), or /etc/home-server/ai-provider (default: antigravity).
+# Provider comes from ASK_PROVIDER, profile.json ("provider"), the Dashboard's switch (ai-provider.env) or /etc/home-server/ai-provider (default: antigravity).
 # In Antigravity mode, runs `agy -p --model gemini-3.8-flash-low` with tools; falls back to Claude Code / Messages API if needed.
 # In Claude mode, runs headless Claude Code (`claude -p --bare`) with Messages API fallback.
 #
@@ -56,7 +56,11 @@ Tu n'as ici aucun outil : ni les fichiers, ni le compte Google, ni la liste de t
 readonly CLAUDE_BIN="${$(profile claude claude):-/opt/homebrew/bin/claude}"
 readonly AGY_BIN="${$(profile agy agy):-${${:-/usr/local/bin/agy}:A}}"
 readonly AGY_MODEL="${ASK_AGY_MODEL:-${$(profile agy_model agy_model):-gemini-3.8-flash-low}}"
-readonly PROVIDER="${ASK_PROVIDER:-${$(profile provider provider):-$(/bin/cat /etc/home-server/ai-provider 2>/dev/null | /usr/bin/tr -d '[:space:]' || print -r -- antigravity)}}"
+# The cloud agent (Claude or Antigravity) is the one switched on in the Dashboard's System tab: AI_PROVIDER in ai-provider.env,
+# read at each call. ASK_PROVIDER or profile.json "provider" still win; /etc/home-server/ai-provider is the older file.
+AI_PROVIDER_ENV="${ASK_AI_PROVIDER_ENV:-/var/lib/routines/data/ai-provider.env}"
+switched() { /usr/bin/sed -n 's/^AI_PROVIDER=//p' "$AI_PROVIDER_ENV" 2>/dev/null | /usr/bin/head -n 1 | /usr/bin/tr -d '[:space:]'; }
+readonly PROVIDER="${ASK_PROVIDER:-${$(profile provider provider):-${$(switched):-$(/bin/cat /etc/home-server/ai-provider 2>/dev/null | /usr/bin/tr -d '[:space:]' || print -r -- antigravity)}}}"
 readonly SESSION_FILE="$HOME_DIR/.cache/ask-haiku/claude-session"
 readonly AGY_SESSION_FILE="$HOME_DIR/.cache/ask-haiku/agy-session"
 readonly NOTE_FILE="$HOME_DIR/.cache/ask-haiku/note"  # what a "oui" ran without the model, told to it on the next turn
